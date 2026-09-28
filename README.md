@@ -139,8 +139,8 @@ Bianca Claire L. Ochoa. BSCS CS401.
 
 ![Built with AI assistance](https://img.shields.io/badge/built%20with-AI%20assistance-0b5fff)
 
-Built with AI assistance from Claude (Anthropic), used for [what: e.g. API research, schema design, code review]. See [AI-USAGE.md](AI-USAGE.md) for the full account.
+Built with AI assistance from Claude (Anthropic). See [AI-USAGE.md](AI-USAGE.md) for the full account.
 
-## Licence
+## License
 
 MIT, see [LICENSE](LICENSE).

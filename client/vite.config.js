@@ -9,11 +9,4 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   base: process.env.VITE_BASE_PATH || '/',
-  server: {
-    // Only used by `npm run dev`. It is NOT part of the production build, which
-    // is why the deployed site needs CORS and this does not. See page 8.
-    proxy: {
-      '/api': 'http://localhost:3000',
-    },
-  },
 })
