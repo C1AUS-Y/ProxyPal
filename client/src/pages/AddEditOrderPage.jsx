@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ChevronLeft, Plus, X } from 'lucide-react'
 import Button from '../components/atoms/Button.jsx'
 import Input from '../components/atoms/Input.jsx'
 import { useOrders } from '../orders/OrdersContext.jsx'
+import { suggestCarriers, searchCarriers, lookupCarrier } from '../api'
 import { formatMoney, todayISO } from '../lib/orders.js'
 import usePageTitle from '../lib/usePageTitle.js'
 
@@ -14,6 +15,112 @@ const newItem = () => ({
   quantity: '1',
 })
 
+const carrierLabel = carrier => `${carrier.name} [${carrier.code}]`
+
+// Picks the courier from the server's carrier list. Nothing here talks to 17track.
+// Tracking only starts once a courier is set (or the number's format identifies one).
+function CarrierPicker({ value, trackingNumber, onChange }) {
+  const [suggestions, setSuggestions] = useState([])
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState([])
+
+  // an existing order only has the courier code, so fetch its name for display
+  useEffect(() => {
+    if (!value || value.name) return
+    lookupCarrier(value.code).then(found => found && onChange(found)).catch(() => {})
+  }, [value, onChange])
+
+  useEffect(() => {
+    const number = trackingNumber.trim()
+    if (number.length < 8) {
+      setSuggestions([])
+      return
+    }
+
+    const timer = setTimeout(() => {
+      suggestCarriers(number).then(setSuggestions).catch(() => setSuggestions([]))
+    }, 400)
+
+    return () => clearTimeout(timer)
+  }, [trackingNumber])
+
+  useEffect(() => {
+    const text = query.trim()
+    if (text.length < 2) {
+      setResults([])
+      return
+    }
+
+    const timer = setTimeout(() => {
+      searchCarriers(text).then(setResults).catch(() => setResults([]))
+    }, 300)
+
+    return () => clearTimeout(timer)
+  }, [query])
+
+  function handleQuery(text) {
+    const hit = results.find(carrier => carrierLabel(carrier) === text)
+
+    if (hit) {
+      onChange(hit)
+      setQuery('')
+      setResults([])
+    } else {
+      setQuery(text)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="pl-1 text-small font-medium text-primary">courier</p>
+
+      {value ? (
+        <div className="flex items-center justify-between gap-2 rounded-2xl bg-text/[0.05] px-4 py-3">
+          <span className="font-medium">{value.name || `courier #${value.code}`}</span>
+          <button type="button" onClick={() => onChange(null)} className="text-small font-medium text-primary underline">
+            change
+          </button>
+        </div>
+      ) : (
+        <>
+          {suggestions.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-small text-primary">likely:</span>
+              {suggestions.map(carrier => (
+                <button
+                  key={carrier.code}
+                  type="button"
+                  onClick={() => onChange(carrier)}
+                  className="rounded-xl bg-accent/60 px-3 py-1.5 text-small font-medium text-primary hover:bg-accent"
+                >
+                  {carrier.name}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <Input
+            list="carrier-options"
+            placeholder="or search for a courier..."
+            value={query}
+            onChange={e => handleQuery(e.target.value)}
+          />
+
+          <datalist id="carrier-options">
+            {results.map(carrier => (
+              <option key={carrier.code} value={carrierLabel(carrier)} />
+            ))}
+          </datalist>
+        </>
+      )}
+
+      <p className="pl-1 text-small text-primary">
+        tracking only starts after a courier is set. nothing is sent to 17track until then.
+      </p>
+    </div>
+  )
+}
+
 function OrderForm({ existing }) {
   const navigate = useNavigate()
   const { orders, addOrder, editOrder, removeOrder } = useOrders()
@@ -23,6 +130,9 @@ function OrderForm({ existing }) {
   const [recipient, setRecipient] = useState(existing?.recipient ?? '')
   const [orderDate, setOrderDate] = useState(existing?.orderDate ?? todayISO())
   const [trackingNumber, setTrackingNumber] = useState(existing?.trackingNumber ?? '')
+  const [carrier, setCarrier] = useState(
+    existing?.trackingCarrier ? { code: existing.trackingCarrier, name: '' } : null
+  )
   const [notes, setNotes] = useState(existing?.notes ?? '')
 
   const [items, setItems] = useState(
@@ -66,6 +176,7 @@ function OrderForm({ existing }) {
       recipient: recipient.trim(),
       orderDate,
       trackingNumber: trackingNumber.trim() || null,
+      trackingCarrier: carrier?.code ?? null,
       notes: notes.trim(),
       items: items.map(({ id, name, price, quantity }) => ({
         ...(id ? { id } : {}),
@@ -165,6 +276,8 @@ function OrderForm({ existing }) {
           onChange={e => setTrackingNumber(e.target.value)}
         />
       </div>
+
+      <CarrierPicker value={carrier} trackingNumber={trackingNumber} onChange={setCarrier} />
 
       <div className="rounded-2xl bg-bg p-4 text-small text-primary">
         <p className="font-bold text-text">status updates automatically</p>

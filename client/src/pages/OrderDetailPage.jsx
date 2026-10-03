@@ -248,6 +248,12 @@ export default function OrderDetailPage() {
               <p className="text-small text-primary">No tracking number yet. Add one by editing the order.</p>
             )}
 
+            {order.trackingNumber && !order.trackingCarrier && (
+              <p className="mb-4 text-small text-primary">
+                No courier set yet, so tracking has not started. Edit the order and pick one.
+              </p>
+            )}
+
             {events.length > 0 && (
               <ol className="mt-1 flex flex-col">
                 {events.map((event, index) => {

@@ -7,4 +7,7 @@ export {
   updateOrder,
   deleteOrder,
   addPayment,
+  suggestCarriers,
+  searchCarriers,
+  lookupCarrier,
 } from './httpApi.js'

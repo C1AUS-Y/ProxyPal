@@ -4,6 +4,7 @@ import { pool } from './db/pool.js'
 import { requireAuth } from './auth.js'
 import * as orders from './ordersRepo.js'
 import * as track17 from './track17.js'
+import { trackIfMatched, matchCarrier, suggestCarriers, searchCarriers, getCarrier, isKnownCarrier } from './carrierFallback.js'
 
 const app = express()
 
@@ -41,7 +42,7 @@ function validateOrder(body) {
   if (proxyName.length > 120) errors.push('proxyName must be 120 characters or fewer')
   if (!platform) errors.push('platform is required')
   if (recipient.length > 120) errors.push('recipient must be 120 characters or fewer')
-  if (trackingCarrier !== null && !Number.isInteger(trackingCarrier)) errors.push('trackingCarrier must be a valid carrier code')
+  if (trackingCarrier !== null && !isKnownCarrier(trackingCarrier)) errors.push('trackingCarrier is not a known courier code')
 
   const cleanItems = items.map((item, index) => {
     const name = typeof item.name === 'string' ? item.name.trim() : ''
@@ -75,12 +76,15 @@ async function syncTracking(userId, orderId, number, carrier = null) {
   if (!number) return
 
   try {
-    const accepted = await track17.registerNumber(number, carrier)
-    const detectedCarrier = accepted?.carrier || carrier
-    const result = await track17.getStatus(number, detectedCarrier)
+    const { result, carrier: foundCarrier, needsCarrier, suggestions } = await trackIfMatched(number, carrier)
+
+    if (foundCarrier && !carrier) await orders.setCarrier(pool, userId, orderId, foundCarrier)
 
     if (result) {
-      await orders.setTracking(pool, userId, orderId, result.status, result.events, result.carrier || detectedCarrier)
+      await orders.setTracking(pool, userId, orderId, result.status, result.events, foundCarrier)
+    } else if (needsCarrier) {
+      const names = suggestions.map(c => `${c.name} (${c.code})`).join(', ')
+      console.warn(`no courier matched for ${number}, nothing sent to 17track. Suggestions: ${names || 'none'}`)
     }
   } catch (error) {
     console.error('17track sync failed:', error.message)
@@ -124,25 +128,17 @@ app.get('/api/orders/:id', async (request, response, next) => {
   }
 })
 
-app.get('/api/carriers', async (request, response, next) => {
-  try {
-    const result = await pool.query(
-      'SELECT code, name, country, alias FROM carriers ORDER BY name'
-    )
-    response.json(result.rows)
-  } catch (error) {
-    next(error)
-  }
+// all carrier routes read the bundled carriers.json: free, no 17track call
+app.get('/api/carriers', (request, response) => {
+  const { q, code } = request.query
+  if (code) return response.json([getCarrier(code)].filter(Boolean))
+  response.json(searchCarriers(q, 20))
 })
 
-app.post('/api/carriers/sync', async (request, response, next) => {
-  try {
-    const data = await track17.getCarrierList()
-    console.log(JSON.stringify(data).slice(0, 3000))
-    response.json({ success: true, data })
-  } catch (error) {
-    next(error)
-  }
+app.get('/api/carriers/suggest', (request, response) => {
+  const number = typeof request.query.number === 'string' ? request.query.number : ''
+  const { carrier, suggestions } = matchCarrier(number)
+  response.json({ matched: carrier, suggestions })
 })
 
 app.post('/api/orders', async (request, response, next) => {
@@ -163,13 +159,18 @@ app.put('/api/orders/:id', async (request, response, next) => {
   if (errors.length > 0) return response.status(400).json({ error: errors.join('; ') })
 
   try {
-    const oldTrackingNumber = await orders.getTrackingNumber(pool, request.userId, request.params.id)
-    if (oldTrackingNumber === null) return response.status(404).json({ error: 'Not found' })
+    const before = await orders.getTrackingInfo(pool, request.userId, request.params.id)
+    if (!before) return response.status(404).json({ error: 'Not found' })
 
     const order = await orders.update(pool, request.userId, request.params.id, value)
     if (!order) return response.status(404).json({ error: 'Not found' })
 
-    if (value.trackingNumber) {
+    // editing notes or items must not re-send the number to 17track
+    const changed =
+      value.trackingNumber !== (before.tracking_number ?? null) ||
+      Number(value.trackingCarrier ?? 0) !== Number(before.tracking_carrier ?? 0)
+
+    if (value.trackingNumber && changed) {
       syncTracking(request.userId, order.id, value.trackingNumber, value.trackingCarrier)
     }
 
@@ -208,8 +209,16 @@ app.post('/api/orders/:id/tracking', async (request, response, next) => {
     if (!tracking) return response.status(404).json({ error: 'Not found' })
     if (!tracking.tracking_number) return response.status(400).json({ error: 'This order has no tracking number' })
 
-    const accepted = await track17.registerNumber(tracking.tracking_number, tracking.tracking_carrier)
-    response.status(202).json({ registered: Boolean(accepted), carrier: accepted?.carrier ?? tracking.tracking_carrier ?? null })
+    const { result, carrier, needsCarrier, suggestions } = await trackIfMatched(tracking.tracking_number, tracking.tracking_carrier)
+
+    if (needsCarrier) {
+      return response.status(422).json({ error: 'Pick the courier for this order first', needsCarrier: true, suggestions })
+    }
+
+    if (carrier && !tracking.tracking_carrier) await orders.setCarrier(pool, request.userId, request.params.id, carrier)
+    if (result) await orders.setTracking(pool, request.userId, request.params.id, result.status, result.events, carrier)
+
+    response.status(202).json({ registered: true, carrier })
   } catch (error) {
     next(error)
   }
@@ -221,19 +230,16 @@ app.get('/api/orders/:id/tracking', async (request, response, next) => {
     if (!tracking) return response.status(404).json({ error: 'Not found' })
     if (!tracking.tracking_number) return response.status(400).json({ error: 'This order has no tracking number' })
 
-    const result = await track17.getStatus(tracking.tracking_number, tracking.tracking_carrier)
+    // no courier saved means nothing is sent to 17track, only local suggestions come back
+    if (!tracking.tracking_carrier) {
+      const suggestions = suggestCarriers(tracking.tracking_number)
+      return response.json({ status: 'ordered', events: [], needsCarrier: true, suggestions })
+    }
 
+    const result = await track17.getStatus(tracking.tracking_number, tracking.tracking_carrier)
     if (!result) return response.json({ status: 'ordered', events: [] })
 
-    await orders.setTracking(
-      pool,
-      request.userId,
-      request.params.id,
-      result.status,
-      result.events,
-      result.carrier
-    )
-
+    await orders.setTracking(pool, request.userId, request.params.id, result.status, result.events, result.carrier)
     response.json(result)
   } catch (error) {
     next(error)

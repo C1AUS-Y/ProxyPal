@@ -159,3 +159,11 @@ export async function setStatus(pool, userId, orderId, status) {
   )
   return result.rows[0] ?? null
 }
+
+export async function setCarrier(pool, userId, orderId, carrier) {
+  const result = await pool.query(
+    'UPDATE orders SET tracking_carrier = $1 WHERE id = $2 AND user_id = $3 RETURNING id',
+    [carrier, orderId, userId]
+  )
+  return result.rows[0] ?? null
+}

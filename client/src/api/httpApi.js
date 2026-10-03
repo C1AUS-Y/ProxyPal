@@ -14,6 +14,7 @@ function toPage(row) {
     orderDate: row.order_date || '',
     status: labels[values.indexOf(row.status)] || 'Ordered',
     trackingNumber: row.tracking_number,
+    trackingCarrier: row.tracking_carrier ?? null,
     notes: row.notes || '',
     items: (row.items || []).map(item => ({
       id: item.id,
@@ -93,4 +94,19 @@ export async function addPayment(orderId, payment) {
       method: payment.method,
     })
   )
+}
+
+// courier lookups. These only read the server's bundled carrier list, nothing is sent to 17track
+export async function suggestCarriers(number) {
+  const data = await request(`/api/carriers/suggest?number=${encodeURIComponent(number)}`)
+  return data.suggestions
+}
+
+export async function searchCarriers(query) {
+  return request(`/api/carriers?q=${encodeURIComponent(query)}`)
+}
+
+export async function lookupCarrier(code) {
+  const list = await request(`/api/carriers?code=${encodeURIComponent(code)}`)
+  return list[0] ?? null
 }

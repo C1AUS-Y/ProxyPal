@@ -26,23 +26,74 @@ const EVENT_LABELS = {
 
 const CARRIER_LIST_URL = 'https://res.17track.net/asset/carrier/info/apicarrier.all.json'
 
-async function call(endpoint, body) {
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
+
+// 17TRACK rate-limits requests, so space them out (one at a time, at least MIN_GAP_MS apart)
+const MIN_GAP_MS = 400
+const MAX_RETRIES = 2
+let queue = Promise.resolve()
+let lastCallAt = 0
+
+function throttled(task) {
+  const run = queue.then(async () => {
+    const wait = lastCallAt + MIN_GAP_MS - Date.now()
+    if (wait > 0) await sleep(wait)
+    try {
+      return await task()
+    } finally {
+      lastCallAt = Date.now()
+    }
+  })
+  queue = run.catch(() => {})
+  return run
+}
+
+async function call(endpoint, body, attempt = 0) {
   if (!TRACK17_KEY) throw new Error('TRACK17_KEY is not configured')
 
-  const response = await fetch(`${BASE_URL}/${endpoint}`, {
-    method: 'POST',
-    headers: {
-      '17token': TRACK17_KEY,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  })
+  if (process.env.TRACK17_DRY_RUN === '1') {
+    console.log(`[dry run] would call ${endpoint}:`, JSON.stringify(body))
+    return { code: 0, data: { accepted: [], rejected: [] } }
+  }
 
-  const data = await response.json()
+  const response = await throttled(() =>
+    fetch(`${BASE_URL}/${endpoint}`, {
+      method: 'POST',
+      headers: {
+        '17token': TRACK17_KEY,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    })
+  )
+
+  // read as text first: a rate-limit or gateway error is not always JSON
+  const text = await response.text()
+  let data = null
+  try {
+    data = JSON.parse(text)
+  } catch {
+    // not JSON
+  }
+
+  const retryable = response.status === 429
+  if (retryable && attempt < MAX_RETRIES) {
+    await sleep(1000 * (attempt + 1))
+    return call(endpoint, body, attempt + 1)
+  }
+
+  if (data === null) {
+    throw new Error(`17track returned a non-JSON reply (HTTP ${response.status}): ${text.slice(0, 200)}`)
+  }
 
   if (!response.ok) throw new Error(data?.message || `17track returned ${response.status}`)
 
   return data
+}
+
+function isAlreadyRegistered(error) {
+  if (!error) return false
+  return error.code === -18019901 || /already\s+registered/i.test(error.message || '')
 }
 
 export async function registerNumber(number, carrier = null) {
@@ -61,6 +112,10 @@ export async function registerNumber(number, carrier = null) {
   const rejected = result.data?.rejected?.[0]
 
   if (accepted) return accepted
+
+  if (rejected && isAlreadyRegistered(rejected.error)) {
+    return { number: rejected.number, carrier: carrier ? Number(carrier) : null, alreadyRegistered: true }
+  }
 
   if (rejected) {
     const error = new Error(rejected.error?.message || '17track rejected the tracking number')
