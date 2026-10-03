@@ -1,16 +1,14 @@
 import { Link } from 'react-router-dom'
 
 const BASE =
-  'inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-body font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50'
+  'press inline-flex select-none items-center justify-center gap-2 rounded-full px-5 py-3 text-body font-semibold disabled:pointer-events-none disabled:opacity-40'
 
 const VARIANTS = {
-  primary: 'bg-primary text-surface shadow-md hover:bg-text',
-  accent: 'bg-accent text-text shadow-md hover:bg-accent/70',
-  ghost: 'text-primary hover:bg-accent/60',
+  primary: 'bg-text text-surface shadow-pop hover:opacity-90',
+  accent: 'bg-text/[0.07] text-text hover:bg-text/[0.12]',
+  ghost: 'text-primary hover:bg-text/[0.06] hover:text-text',
 }
 
-// Renders a <Link> when given `to` (navigation) and a <button> otherwise
-// (an action). Both look the same.
 export default function Button({ variant = 'primary', to, type = 'button', className = '', children, ...rest }) {
   const classes = `${BASE} ${VARIANTS[variant] ?? VARIANTS.primary} ${className}`
 

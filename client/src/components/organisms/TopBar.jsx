@@ -1,67 +1,46 @@
 import { useEffect, useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
-import { Menu, Plus, User, UserCircle, X } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { useAuth } from '../../auth/AuthContext.jsx'
+import { getDisplayName } from '../../lib/profile.js'
 
 export default function TopBar() {
-  const [open, setOpen] = useState(false)
-  const { pathname } = useLocation()
-
-  // Going anywhere closes the menu.
-  useEffect(() => setOpen(false), [pathname])
+  const { user } = useAuth()
+  const [scrolled, setScrolled] = useState(false)
 
   useEffect(() => {
-    if (!open) return undefined
-    const onKey = (event) => event.key === 'Escape' && setOpen(false)
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [open])
+    const onScroll = () => setScrolled(window.scrollY > 4)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
+  const initial = getDisplayName(user).trim().charAt(0).toUpperCase() || 'P'
 
   return (
-    <header className="sticky top-0 z-30 border-b border-accent bg-surface">
-      <div className="flex h-14 items-center gap-3 px-4">
-        {/* Phone only: from 768px the tab rail already shows every screen. */}
-        <button
-          type="button"
-          className="-ml-2 flex h-10 w-10 items-center justify-center rounded-xl text-text hover:bg-bg md:hidden"
-          aria-label={open ? 'Close menu' : 'Open menu'}
-          aria-expanded={open}
-          aria-controls="top-menu"
-          onClick={() => setOpen((value) => !value)}
-        >
-          {open ? <X size={22} /> : <Menu size={22} />}
-        </button>
-
-        <Link to="/" className="flex-1 font-display text-subheading font-bold text-text">
-          ProxyPal<span aria-hidden="true">.</span>
+    <header
+      className={`sticky top-0 z-30 border-b bg-bg/70 pt-[env(safe-area-inset-top)] backdrop-blur-xl backdrop-saturate-150 transition-colors duration-300 md:pl-28 ${
+        scrolled ? 'border-text/10' : 'border-transparent'
+      }`}
+    >
+      <div className="mx-auto flex h-14 w-full max-w-5xl items-center gap-3 px-4">
+        <Link to="/" className="press flex flex-1 items-center gap-2.5">
+          <span
+            aria-hidden="true"
+            className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-text font-display text-[16px] font-bold text-surface shadow-pop"
+          >
+            P
+          </span>
+          <span className="font-display text-subheading font-bold tracking-tight">ProxyPal</span>
         </Link>
 
         <Link
           to="/account"
           aria-label="Account"
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-text"
+          className="press flex h-9 w-9 items-center justify-center rounded-full bg-text text-small font-bold text-surface shadow-pop ring-2 ring-surface transition duration-300 ease-spring hover:scale-110"
         >
-          <User size={18} />
+          {initial}
         </Link>
       </div>
-
-      {open && (
-        <nav id="top-menu" aria-label="Menu" className="border-t border-accent px-4 py-2 md:hidden">
-          <ul>
-            <li>
-              <Link to="/orders/new" className="flex items-center gap-3 py-3">
-                <Plus size={18} className="text-primary" />
-                New order
-              </Link>
-            </li>
-            <li>
-              <Link to="/account" className="flex items-center gap-3 py-3">
-                <UserCircle size={18} className="text-primary" />
-                Account
-              </Link>
-            </li>
-          </ul>
-        </nav>
-      )}
     </header>
   )
 }

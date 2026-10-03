@@ -1,16 +1,20 @@
-import { User } from 'lucide-react'
+import { LogOut } from 'lucide-react'
 import Button from '../components/atoms/Button.jsx'
 import { useOrders } from '../orders/OrdersContext.jsx'
+import { useAuth } from '../auth/AuthContext.jsx'
 import { formatMoney, getAllPayments } from '../lib/orders.js'
-import { PROFILE } from '../lib/profile.js'
+import { getDisplayName } from '../lib/profile.js'
 import usePageTitle from '../lib/usePageTitle.js'
+import { supabase } from '../lib/supabaseClient.js'
 
 export default function AccountPage() {
   usePageTitle('Account')
   const { orders } = useOrders()
+  const { user } = useAuth()
 
   const payments = getAllPayments(orders)
   const totalPaid = payments.reduce((sum, p) => sum + Number(p.amount), 0)
+  const name = getDisplayName(user)
 
   const stats = [
     ['Orders logged', orders.length],
@@ -18,28 +22,39 @@ export default function AccountPage() {
     ['Total paid', formatMoney(totalPaid)],
   ]
 
-  return (
-    <div className="mx-auto flex max-w-sm flex-col items-center gap-4 py-4">
-      <div className="flex h-24 w-24 items-center justify-center rounded-full bg-accent text-primary shadow-md">
-        <User size={44} />
-      </div>
-      <h1 className="text-heading font-bold">{PROFILE.name}</h1>
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+  }
 
-      <dl className="w-full overflow-hidden rounded-2xl bg-surface shadow-md">
+  return (
+    <div className="mx-auto flex max-w-sm flex-col items-center gap-6 py-4">
+      <div className="rise relative">
+        <div aria-hidden="true" className="float-slow absolute inset-0 -z-10 scale-125 rounded-full bg-text/10 blur-2xl" />
+        <div className="flex h-28 w-28 items-center justify-center rounded-full bg-text text-[44px] font-bold text-surface shadow-float ring-4 ring-surface">
+          {name.trim().charAt(0).toUpperCase() || 'P'}
+        </div>
+      </div>
+
+      <div className="rise text-center" style={{ '--i': 1 }}>
+        <h1 className="text-heading font-bold">{name}</h1>
+        <p className="text-small text-primary">{user?.email}</p>
+      </div>
+
+      <dl className="card divided rise w-full overflow-hidden" style={{ '--i': 2 }}>
         {stats.map(([label, value]) => (
-          <div key={label} className="flex justify-between border-b border-accent px-4 py-3 last:border-0">
+          <div key={label} className="flex justify-between px-5 py-4">
             <dt className="text-primary">{label}</dt>
-            <dd className="font-medium">{value}</dd>
+            <dd className="font-semibold tabular-nums">{value}</dd>
           </div>
         ))}
       </dl>
 
-      <Button className="w-full" disabled>
-        Log out
-      </Button>
-      <p className="text-center text-small text-primary">
-        Sign-in arrives with the database, so there is nothing to log out of yet.
-      </p>
+      <div className="rise w-full" style={{ '--i': 3 }}>
+        <Button variant="accent" className="w-full" onClick={handleLogout}>
+          <LogOut size={18} />
+          Log out
+        </Button>
+      </div>
     </div>
   )
 }

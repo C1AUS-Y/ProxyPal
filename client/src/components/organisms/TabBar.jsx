@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
 import { Home, MoreHorizontal, ShoppingBag, Wallet } from 'lucide-react'
 
 const TABS = [
@@ -8,29 +8,50 @@ const TABS = [
   { label: 'More', to: '/account', Icon: MoreHorizontal },
 ]
 
-// Bottom bar on a phone, a rail down the left side from 768px up.
 export default function TabBar() {
+  const { pathname } = useLocation()
+  const index = TABS.findIndex(({ to, end }) => (end ? pathname === to : pathname === to || pathname.startsWith(`${to}/`)))
+
   return (
     <nav
       aria-label="Main"
-      className="fixed inset-x-0 bottom-0 z-20 flex justify-around bg-accent px-2 py-2 shadow-[0_-2px_10px_rgba(0,0,0,0.1)] md:inset-x-auto md:bottom-0 md:left-0 md:top-14 md:w-24 md:flex-col md:items-center md:justify-start md:gap-4 md:px-0 md:pt-6 md:shadow-[2px_0_10px_rgba(0,0,0,0.1)]"
+      className="fixed inset-x-4 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-40 mx-auto max-w-sm md:inset-x-auto md:bottom-auto md:left-5 md:top-1/2 md:mx-0 md:max-w-none md:-translate-y-1/2"
     >
-      {TABS.map(({ label, to, Icon, end }) => (
-        <NavLink key={to} to={to} end={end} className="flex flex-col items-center gap-1 text-small font-medium text-text">
-          {({ isActive }) => (
-            <>
-              <span
-                className={`flex h-11 w-11 items-center justify-center rounded-xl shadow-md transition-colors ${
-                  isActive ? 'bg-text text-surface' : 'bg-bg text-primary'
-                }`}
-              >
-                <Icon size={20} />
-              </span>
-              {label}
-            </>
-          )}
-        </NavLink>
-      ))}
+      <div className="glass rounded-[30px] p-1.5 shadow-float ring-1 ring-text/[0.08]">
+        <div
+          className="relative grid grid-cols-4 md:w-[72px] md:grid-cols-1"
+          style={{ '--i': Math.max(index, 0) }}
+        >
+          <span
+            aria-hidden="true"
+            className={`absolute left-0 top-0 h-full w-1/4 translate-x-[calc(var(--i)*100%)] transition-all duration-500 ease-ios md:h-1/4 md:w-full md:translate-x-0 md:translate-y-[calc(var(--i)*100%)] ${
+              index < 0 ? 'scale-90 opacity-0' : 'opacity-100'
+            }`}
+          >
+            <span className="block h-full w-full rounded-[24px] bg-text shadow-pop" />
+          </span>
+
+          {TABS.map(({ label, to, Icon, end }) => (
+            <NavLink
+              key={to}
+              to={to}
+              end={end}
+              className="press relative z-10 flex h-14 flex-col items-center justify-center gap-0.5 rounded-[24px] text-[11px] font-semibold md:h-[68px]"
+            >
+              {({ isActive }) => (
+                <span
+                  className={`flex flex-col items-center gap-0.5 transition-colors duration-300 ${
+                    isActive ? 'text-surface' : 'text-primary'
+                  }`}
+                >
+                  <Icon size={21} strokeWidth={isActive ? 2.25 : 1.75} />
+                  {label}
+                </span>
+              )}
+            </NavLink>
+          ))}
+        </div>
+      </div>
     </nav>
   )
 }

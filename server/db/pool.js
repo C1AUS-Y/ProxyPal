@@ -34,3 +34,6 @@ export const pool = new pg.Pool({
 pool.on('error', (error) => {
   console.error('Unexpected database pool error:', error.message)
 })
+
+// yyyy-mm-dd
+pg.types.setTypeParser(1082, (value) => value)

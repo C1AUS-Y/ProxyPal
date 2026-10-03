@@ -1,84 +1,108 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react'
-import {
-  listOrders,
-  createOrder,
-  updateOrder,
-  deleteOrder,
-  addPayment,
-} from '../api'
+import { useAuth } from '../auth/AuthContext.jsx'
+import { listOrders, createOrder, updateOrder, deleteOrder, addPayment } from '../api'
 import { sortOrders } from '../lib/orders.js'
-
-// State ownership, as planned in docs/01-proposal.md: App owns the orders, with
-// items and payments nested inside each one. Screens read them from here and
-// change them through the functions below. Nothing else holds a copy.
 
 const OrdersContext = createContext(null)
 
-const replaceOrder = (orders, updated) =>
-  orders.map((order) => (String(order.id) === String(updated.id) ? updated : order))
-
 export function OrdersProvider({ children }) {
-  const [status, setStatus] = useState('loading') // loading | ready | error
+  const { user } = useAuth()
+  const [status, setStatus] = useState('loading')
   const [orders, setOrders] = useState([])
   const [error, setError] = useState(null)
   const [slow, setSlow] = useState(false)
 
-  const load = useCallback(async () => {
-    setStatus('loading')
+  const load = useCallback(async (showLoading = true) => {
+    if (showLoading) setStatus('loading')
     setError(null)
 
-    // A free-tier API sleeps. If this takes a while, say so instead of
-    // spinning silently, which looks broken.
-    const timer = setTimeout(() => setSlow(true), 3000)
+    const timer = showLoading ? setTimeout(() => setSlow(true), 3000) : null
 
     try {
-      setOrders(sortOrders(await listOrders()))
+      const freshOrders = await listOrders()
+      setOrders(sortOrders(freshOrders))
       setStatus('ready')
     } catch (caught) {
       setError(caught)
-      setStatus('error')
+      if (showLoading) setStatus('error')
     } finally {
-      clearTimeout(timer)
-      setSlow(false)
+      if (timer) clearTimeout(timer)
+      if (showLoading) setSlow(false)
     }
   }, [])
 
   useEffect(() => {
-    load()
-  }, [load])
+    if (!user?.id) {
+      setOrders([])
+      return
+    }
 
-  // The four functions below throw on failure. The screen that called them
-  // catches and shows the message next to the form the person is looking at.
-  const addOrder = async (input) => {
+    load()
+
+    // check for 17track updates every 15 seconds
+    const interval = setInterval(() => load(false), 15000)
+
+    return () => clearInterval(interval)
+  }, [user?.id, load])
+
+  async function addOrder(input) {
     const created = await createOrder(input)
-    setOrders((current) => sortOrders([created, ...current]))
+    setOrders(current => sortOrders([created, ...current]))
     return created
   }
 
-  const editOrder = async (id, input) => {
+  async function editOrder(id, input) {
     const updated = await updateOrder(id, input)
-    setOrders((current) => sortOrders(replaceOrder(current, updated)))
+    setOrders(current =>
+      sortOrders(
+        current.map(order =>
+          String(order.id) === String(updated.id) ? updated : order
+        )
+      )
+    )
     return updated
   }
 
-  const removeOrder = async (id) => {
+  async function removeOrder(id) {
     await deleteOrder(id)
-    setOrders((current) => current.filter((order) => String(order.id) !== String(id)))
+    setOrders(current => current.filter(order => String(order.id) !== String(id)))
   }
 
-  const logPayment = async (orderId, payment) => {
+  async function logPayment(orderId, payment) {
     const updated = await addPayment(orderId, payment)
-    setOrders((current) => replaceOrder(current, updated))
+    setOrders(current =>
+      current.map(order =>
+        String(order.id) === String(updated.id) ? updated : order
+      )
+    )
     return updated
   }
 
-  const value = { status, orders, error, slow, reload: load, addOrder, editOrder, removeOrder, logPayment }
-
-  return <OrdersContext.Provider value={value}>{children}</OrdersContext.Provider>
+  return (
+    <OrdersContext.Provider
+      value={{
+        status,
+        orders,
+        error,
+        slow,
+        reload: load,
+        addOrder,
+        editOrder,
+        removeOrder,
+        logPayment,
+      }}
+    >
+      {children}
+    </OrdersContext.Provider>
+  )
 }
 
 export function useOrders() {
   const context = useContext(OrdersContext)
-  if (!context) throw new Error('useOrders must be used inside <OrdersProvider>')
+
+  if (!context) {
+    throw new Error('useOrders must be used inside OrdersProvider')
+  }
+
   return context
 }

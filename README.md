@@ -1,35 +1,29 @@
 # ProxyPal
 
-ProxyPal is a web app for people who buy through proxy shopping services. It tracks orders, items, payments, the balance still owed, and package status in one place instead of a spreadsheet.
+ProxyPal is a web app for people who buy through proxy shopping services, whether for themselves or on behalf of someone else. It tracks orders, items, payments, the balance still owed, and package status in one place, replacing the spreadsheet most people use for this.
 
-**Live site:** https://c1aus-y.github.io/ProxyPal/
-**API:** https://your-api.onrender.com/healthz
-**Demo video:** (link)
+- **Live site:** https://c1aus-y.github.io/ProxyPal/
+- **API health check:** todo
+- **Demo video:** todo
 
-> **This deployment is running in demo mode.** The interface is real; the backend
-> is simulated in your browser so the site works without a server. See
-> [Demo mode](#demo-mode) below. Delete this quote once your API is live.
+## Features
 
-![A screenshot of the main screen](docs/assets/screenshot.png)
-
-## What it does
-
-- **Dashboard:** active orders, total still owed, and orders that need a tracking update
-- **Orders:** every order placed through a proxy, for yourself or for someone else (sister, mom, a friend), with search and a New Order button
-- **Order Detail:** the proxy, platform, recipient, items, payment history, remaining balance and courier tracking for one order
-- **Add / Edit Order:** log a new order or change its items, cost or proxy
+- **Dashboard:** active orders, the total still owed, and recent orders
+- **Orders:** every order placed through a proxy, with search and a New Order button
+- **Order detail:** proxy, platform, recipient, items, payment history, remaining balance and courier tracking for one order
+- **Add / edit order:** log a new order or change its items, cost or proxy
 - **Payments:** a log of every payment made across all orders
 - **Account:** profile and log out
 
-The remaining balance is always calculated from the items and payments (items total minus payments). It is never stored, so it cannot go out of sync.
+The remaining balance is always calculated from the items and payments (items total minus payments) by a database view. It is never stored, so it cannot go out of sync.
 
 ## Built with
 
-React, Vite and Tailwind CSS on the front end. Express on the back end. PostgreSQL hosted on Supabase, with Supabase Auth for login. Package tracking comes from the 17TRACK API. The client is on GitHub Pages, the API on (host), the database on Supabase.
+React, Vite and Tailwind CSS on the front end. Express on the back end. PostgreSQL hosted on Supabase, with Supabase Auth for login. Package tracking comes from the 17TRACK API. A Supabase Edge Function receives 17TRACK's tracking webhooks and saves the new status, so tracking updates arrive without anyone re-saving an order. The client is hosted on GitHub Pages and the database on Supabase.
 
 ## Architecture
 
-The React client logs users in through Supabase Auth and sends the resulting token with every request to the Express API. The API verifies the token, reads and writes PostgreSQL on Supabase with parameterised queries that always filter by the logged-in user, and calls 17TRACK for shipment status. The 17TRACK key lives only on the API server, never in the client.
+The React client logs users in through Supabase Auth and sends the resulting token with every request to the Express API. The API verifies the token, reads and writes PostgreSQL using parameterised queries that always filter by the logged-in user, and calls 17TRACK for shipment status. The 17TRACK key lives only on the API server, never in the client.
 
     Browser (React, GitHub Pages)
        |  login                        |  Bearer token
@@ -39,105 +33,148 @@ The React client logs users in through Supabase Auth and sends the resulting tok
                                  v            v
                      PostgreSQL (Supabase)   17TRACK API
 
-## Demo mode
+## Setup
 
-The client can run two ways, chosen by one environment variable at **build** time.
+**Install first**
 
-**Demo mode is the default.** Only the exact string `false` turns it off, so a forgotten or mistyped variable leaves you on the simulated backend with a visible notice rather than a silently broken build.
+- Node.js 20 or newer
+- A free [Supabase](https://supabase.com) project
+- A [17TRACK](https://api.17track.net) API key
 
-| `VITE_USE_MOCK_API` | What happens |
+**1. Get the code and install**
+
+    git clone https://github.com/C1AUS-Y/ProxyPal.git
+    cd ProxyPal
+    cd server && npm install
+    cd ../client && npm install
+
+**2. Create the database**
+
+Open your Supabase project, go to the SQL Editor, paste in the contents of `server/db/schema.sql` and run it. This creates the tables, the balance view, row level security and the profile trigger. There is no seed data: a new account starts empty.
+
+**3. Configure environment variables**
+
+In each folder, copy `.env.example` to `.env` and fill it in. Nothing in a `.env` file is committed.
+
+    cp server/.env.example server/.env
+    cp client/.env.example client/.env
+
+Server (`server/.env`):
+
+| Name | What it is |
 | --- | --- |
-| unset, or `true` | The client answers its own requests from `localStorage`. No server, no database, nothing shared between visitors. |
-| `false` | The client calls the Express API at `VITE_API_BASE_URL`, which reads and writes real PostgreSQL. |
+| `DATABASE_URL` | PostgreSQL connection string from Supabase (the session pooler string). Contains a password. Secret |
+| `SUPABASE_URL` | Your Supabase project URL. The API uses it to fetch the keys that verify login tokens |
+| `TRACK17_KEY` | 17TRACK API key. Secret |
+| `CORS_ORIGINS` | Comma-separated origins allowed to call the API, e.g. `http://localhost:5173` |
+| `PORT` | Optional locally (defaults to 3000). Set by the host when deployed |
 
-Demo mode is also the fallback if a free-tier API is asleep during a demo.
+Client (`client/.env`):
 
-## Running it yourself
+| Name | What it is |
+| --- | --- |
+| `VITE_API_BASE_URL` | The API's address, e.g. `http://localhost:3000`, no trailing slash |
+| `VITE_SUPABASE_URL` | Your Supabase project URL |
+| `VITE_SUPABASE_ANON_KEY` | Supabase anon key. Public by design; row level security protects the data |
 
-**The client only, in demo mode.** No database needed.
+Every `VITE_` value is compiled into the built JavaScript and is public. Never put a secret in one.
 
-    cd client
-    npm install
-    cp .env.example .env        # VITE_USE_MOCK_API stays true
-    npm run dev                 # http://localhost:5173
+## Running it
 
-**The whole stack.** Needs a Supabase project (or any PostgreSQL).
+In two terminals:
 
-    # 1. the database: run server/db/schema.sql in the Supabase SQL Editor
-
-    # 2. the API
+    # terminal 1: the API
     cd server
-    npm install
-    cp .env.example .env        # fill in DATABASE_URL and the other values
-    npm run dev                 # http://localhost:3000
+    npm run dev          # http://localhost:3000
 
-    # 3. the client, in another terminal
+    # terminal 2: the client
     cd client
-    npm install
-    cp .env.example .env
-    # set VITE_USE_MOCK_API=false and the Supabase values
-    npm run dev
+    npm run dev          # http://localhost:5173
 
-Check the API on its own before you blame the client:
+Check the API on its own first:
 
-    curl http://localhost:3000/healthz     # is the process alive
-    curl http://localhost:3000/readyz      # is the database reachable
+    curl http://localhost:3000/healthz     # {"ok":true}  the process is alive
+    curl http://localhost:3000/readyz      # {"ok":true,"db":"up"}  the database is reachable
 
-## Environment variables
+Open http://localhost:5173. You should see the login screen. Choose **Sign up**, create an account (if Supabase email confirmation is on, confirm it from your email first), then log in. The dashboard starts empty.
 
-None of these are committed. `.env.example` in each folder lists them with placeholder values.
+## Using the app
 
-| Name | Where | What it is |
-| --- | --- | --- |
-| `DATABASE_URL` | server | PostgreSQL connection string. Contains a password |
-| `SUPABASE_JWT_SECRET` | server | used to verify login tokens. Secret |
-| `TRACK17_KEY` | server | 17TRACK API key. Secret |
-| `CORS_ORIGINS` | server | comma-separated origins allowed to call the API |
-| `NODE_ENV` | server | `production` on your host |
-| `PORT` | server | **set by the host**, do not set it yourself |
-| `VITE_USE_MOCK_API` | client, at build time | only `false` turns demo mode off |
-| `VITE_API_BASE_URL` | client, at build time | your API's public URL, no trailing slash |
-| `VITE_SUPABASE_URL` | client, at build time | your Supabase project URL |
-| `VITE_SUPABASE_ANON_KEY` | client, at build time | Supabase anon key. Public by design; row-level security protects the data |
+1. **Sign up and log in.** Every screen except the login page needs an account.
+2. **Add an order** with the + button: the proxy, the platform, who it is for, and its items. Add a tracking number if you have one.
+3. **Open the order** to see its items, the balance, and tracking status.
+4. **Log a payment** on the order detail screen. The remaining balance updates.
+5. **Check Payments** for every payment across all orders.
 
-Every `VITE_` value is compiled into the built JavaScript and is **public**. Never put a secret in one.
+## API
 
-## Deploying
+Every `/api` route needs an `Authorization: Bearer <token>` header (the Supabase login token) and only ever returns the logged-in user's own data. Without a valid token the API returns `401`.
 
-**Client, to GitHub Pages.** Already wired up in `.github/workflows/deploy-pages.yml`.
+| Method | Path | What it does | Success / errors |
+| --- | --- | --- | --- |
+| GET | `/healthz` | Is the server process alive | 200 |
+| GET | `/readyz` | Is the database reachable | 200, 503 |
+| GET | `/api/orders` | List your orders with items and payments | 200 |
+| GET | `/api/orders/:id` | One order with items, payments and balance | 200, 404 |
+| POST | `/api/orders` | Create an order with its items | 201, 400 |
+| PUT | `/api/orders/:id` | Replace an order's details and items | 200, 400, 404 |
+| DELETE | `/api/orders/:id` | Delete an order | 204, 404 |
+| POST | `/api/orders/:id/payments` | Log a payment against an order | 201, 400, 404 |
+| POST | `/api/orders/:id/tracking` | Register the order's tracking number with 17TRACK | 202, 400, 404 |
+| GET | `/api/orders/:id/tracking` | Fetch the latest 17TRACK status and save it on the order | 200, 400, 404 |
 
-1. **Settings > Pages > Build and deployment > Source: GitHub Actions.**
-2. Once the API is live, add `VITE_USE_MOCK_API` = `false`, `VITE_API_BASE_URL`, `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` under **Settings > Secrets and variables > Actions > Variables**, then re-run the workflow. These are compiled in at build time, so the client must be rebuilt.
-
-**API.** Point the host at the `server/` folder and set the server variables above in its dashboard. Set `CORS_ORIGINS` to the exact Pages origin, with no path and no trailing slash.
-
-**Database.** Run `server/db/schema.sql` once in the Supabase SQL Editor.
-
-The repository must be **public** for Pages to serve it on a free account.
+The server validates all input itself, because a browser form can be bypassed.
 
 ## Project structure
 
-    client/                React front end, built by Vite
-      src/api/             one interface, two implementations (mockApi, httpApi)
-      src/components/      atoms, molecules, organisms
-      src/pages/           the seven screens
-    server/                Express API
-      db/                  schema.sql and the connection pool
-    docs/                  proposal, mockup, design system, weekly reports
+    client/                  React front end, built by Vite
+      src/api/               httpApi.js: every call to the Express API
+      src/auth/              login session context and route protection
+      src/components/        atoms, molecules, organisms
+      src/layouts/           the app shell
+      src/lib/               small helpers (money, dates, Supabase client)
+      src/orders/            shared orders state
+      src/pages/             the screens
+    server/                  Express API
+      server.js              routes, validation, error handling
+      auth.js                verifies the Supabase login token
+      ordersRepo.js          all SQL for orders, items and payments
+      track17.js             17TRACK calls and status mapping
+      db/                    schema.sql and the connection pool
+    docs/                    proposal, mockup, design system, reports, security notes
 
-## What I would do next
+## Deploying
 
-- Turn on webhooks from 17TRACK so tracking updates arrive automatically, instead of fetching them when an order is opened
-- Support a currency and exchange rate per order, since proxy orders are often bought in one currency and paid in another
-- Add a desktop side-navigation layout and refine the responsive behaviour
+**Client, to GitHub Pages.** The workflow in `.github/workflows/deploy-pages.yml` builds and publishes on every push to `main` that touches `client/`.
 
-## Author
+1. Set **Settings > Pages > Source** to **GitHub Actions**.
+2. Under **Settings > Secrets and variables > Actions > Variables**, add `VITE_API_BASE_URL`, `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. They are compiled in at build time, so re-run the workflow after changing them.
 
-Bianca Claire L. Ochoa. BSCS CS401.
+**API.** Point your host at the `server/` folder, run `npm start`, and set `DATABASE_URL`, `SUPABASE_URL`, `TRACK17_KEY` and `CORS_ORIGINS` in its dashboard. Set `CORS_ORIGINS` to `https://c1aus-y.github.io` exactly (no path, no trailing slash).
+
+## Screenshots
+
+<!-- to add screenshots -->
+
+| Dashboard | Orders | Order detail |
+| --- | --- | --- |
+|  |  |  |
+
+## Known issues and next steps
+
+**Known issues**
+
+- If someone sends a bad value, the database rejects it, but the user gets a generic 500 error instead of a clear 400 message.
+- Loading the orders list runs a few database queries for every order. It's fine for one person's orders, but it would get slow with a lot of data.
+- I haven't written any automated tests.
+
+**Next steps**
+
+- Let each order have its own currency and exchange rate. Proxy orders are usually bought in one currency and paid for in another, and right now the app treats everything as one amount.
+- Check every field on the server and return a proper 400 with a useful message when something is wrong.
+- Rewrite the orders query so the list loads in fewer trips to the database.
 
 ## AI use
-
-![Built with AI assistance](https://img.shields.io/badge/built%20with-AI%20assistance-0b5fff)
 
 Built with AI assistance from Claude (Anthropic). See [AI-USAGE.md](AI-USAGE.md) for the full account.
 

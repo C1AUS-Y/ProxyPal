@@ -1,14 +1,4 @@
--- The complete shape of the database. Safe to run against an empty database,
--- and safe to run twice.
---
--- This file is committed on purpose. Your schema is a fact about your
--- application, not a runtime concern: it should be readable by opening a file
--- rather than by connecting to a server. It is also what lets you move to a
--- hosted database in one command.
---
--- Users and passwords are handled entirely by Supabase Auth (the auth.users
--- table), which already exists on a Supabase project and is not created here.
-
+-- created using supabase, just establishing it here for reference schema
 CREATE TABLE IF NOT EXISTS profiles (
   id          UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   full_name   TEXT,
@@ -28,8 +18,7 @@ CREATE TABLE IF NOT EXISTS orders (
   notes           TEXT
 );
 
--- The Orders list always sorts newest first. Without this the database reads
--- every row and sorts it on each request.
+-- always on newest first
 CREATE INDEX IF NOT EXISTS orders_user_id_idx ON orders (user_id);
 
 CREATE TABLE IF NOT EXISTS items (
@@ -53,8 +42,7 @@ CREATE TABLE IF NOT EXISTS payments (
 
 CREATE INDEX IF NOT EXISTS payments_order_id_idx ON payments (order_id);
 
--- The balance is always derived here, never stored, so it cannot go stale
--- when an item or payment changes elsewhere.
+-- this is for the balance. to prevent out of sync, its calculation instead of storing the value
 CREATE OR REPLACE VIEW order_totals WITH (security_invoker = true) AS
 SELECT
   o.id AS order_id,
@@ -64,9 +52,7 @@ SELECT
   - COALESCE((SELECT SUM(amount) FROM payments WHERE order_id = o.id), 0) AS balance
 FROM orders o;
 
--- Row Level Security: a belt-and-suspenders layer alongside the ownership
--- checks the Express routes do themselves. Even if a query forgot its
--- WHERE user_id = $1, Postgres still would not hand back someone else's rows.
+-- rls so its safe for multi users
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE orders    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE items     ENABLE ROW LEVEL SECURITY;
@@ -94,7 +80,7 @@ CREATE POLICY "own payments" ON payments
   FOR ALL USING (EXISTS (SELECT 1 FROM orders o WHERE o.id = order_id AND o.user_id = auth.uid()))
   WITH CHECK (EXISTS (SELECT 1 FROM orders o WHERE o.id = order_id AND o.user_id = auth.uid()));
 
--- Auto-create a profile row whenever someone signs up through Supabase Auth.
+-- for new users, create a profile row for them automatically
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -111,6 +97,3 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION handle_new_user();
-
--- Drop the template's leftover table. Safe to run even if it was never created.
-DROP TABLE IF EXISTS sightings;
