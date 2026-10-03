@@ -5,6 +5,20 @@ const BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 const labels = ['Ordered', 'Shipped', 'In Transit', 'Delivered']
 const values = ['ordered', 'shipped', 'in_transit', 'delivered']
 
+// tracking_events can come back as a real list, a JSON string (text column) or null,
+// depending on how it was saved. Always hand the pages a plain array.
+function toEvents(raw) {
+  let value = raw
+  for (let i = 0; i < 2 && typeof value === 'string'; i++) {
+    try {
+      value = JSON.parse(value)
+    } catch {
+      return []
+    }
+  }
+  return Array.isArray(value) ? value.filter(event => event && typeof event === 'object') : []
+}
+
 function toPage(row) {
   return {
     id: row.id,
@@ -28,7 +42,7 @@ function toPage(row) {
       date: payment.paid_on,
       method: payment.method,
     })),
-    trackingEvents: row.tracking_events || [],
+    trackingEvents: toEvents(row.tracking_events),
   }
 }
 

@@ -114,7 +114,7 @@ export default function OrderDetailPage() {
   const balance = getOrderBalance(order)
   const percent = total > 0 ? Math.min(Math.max(paid / total, 0), 1) * 100 : 0
   const payments = order.payments.slice().sort((a, b) => b.date.localeCompare(a.date))
-  const events = order.trackingEvents ?? []
+  const events = Array.isArray(order.trackingEvents) ? order.trackingEvents : []
 
   const details = [
     ['Proxy', order.proxyName],
@@ -190,7 +190,6 @@ export default function OrderDetailPage() {
               )}
             </div>
 
-            {/* How much of the total is paid, as a bar that fills in. */}
             <div className="px-5 pb-4 pt-3">
               <div
                 role="progressbar"

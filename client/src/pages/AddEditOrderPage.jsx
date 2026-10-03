@@ -17,12 +17,11 @@ const newItem = () => ({
 
 const carrierLabel = carrier => `${carrier.name} [${carrier.code}]`
 
-// Picks the courier from the server's carrier list. Nothing here talks to 17track.
-// Tracking only starts once a courier is set (or the number's format identifies one).
 function CarrierPicker({ value, trackingNumber, onChange }) {
   const [suggestions, setSuggestions] = useState([])
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
+  const [lookupError, setLookupError] = useState(null)
 
   // an existing order only has the courier code, so fetch its name for display
   useEffect(() => {
@@ -38,7 +37,15 @@ function CarrierPicker({ value, trackingNumber, onChange }) {
     }
 
     const timer = setTimeout(() => {
-      suggestCarriers(number).then(setSuggestions).catch(() => setSuggestions([]))
+      suggestCarriers(number)
+        .then(list => {
+          setSuggestions(list)
+          setLookupError(null)
+        })
+        .catch(caught => {
+          setSuggestions([])
+          setLookupError(caught)
+        })
     }, 400)
 
     return () => clearTimeout(timer)
@@ -52,7 +59,15 @@ function CarrierPicker({ value, trackingNumber, onChange }) {
     }
 
     const timer = setTimeout(() => {
-      searchCarriers(text).then(setResults).catch(() => setResults([]))
+      searchCarriers(text)
+        .then(list => {
+          setResults(Array.isArray(list) ? list : [])
+          setLookupError(null)
+        })
+        .catch(caught => {
+          setResults([])
+          setLookupError(caught)
+        })
     }, 300)
 
     return () => clearTimeout(timer)
@@ -112,6 +127,12 @@ function CarrierPicker({ value, trackingNumber, onChange }) {
             ))}
           </datalist>
         </>
+      )}
+
+      {lookupError && (
+        <p role="alert" className="pl-1 text-small font-medium text-primary">
+          could not load couriers: {lookupError.message}. check that the API is running the latest code.
+        </p>
       )}
 
       <p className="pl-1 text-small text-primary">

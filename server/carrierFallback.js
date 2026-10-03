@@ -96,9 +96,9 @@ const registered = new Set()
 
 // 17TRACK is called ONLY after a courier is matched in carriers.json:
 //   - the user picked one (checked against the JSON), or
-//   - the number's format belongs to exactly one courier.
-// Otherwise nothing is sent and the suggestions come back for the user to choose from.
-// At most one register call per number+courier, and no status call right after it.
+//   - the number's format belongs to exactly one courier
+// otherwise nothing is sent and the suggestions come back for the user to choose from.
+// at most one register call per number+courier, and no status call right after it.
 export async function trackIfMatched(number, carrier = null) {
   if (!number) return { result: null, carrier: null, needsCarrier: false, suggestions: [] }
 

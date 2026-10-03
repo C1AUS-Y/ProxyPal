@@ -5,8 +5,9 @@ const money = new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP
 export const formatMoney = (amount) => money.format(Number(amount) || 0)
 
 export function formatDate(iso) {
-  if (!iso) return ''
-  const [year, month, day] = iso.split('-').map(Number)
+  if (!iso || typeof iso !== 'string') return ''
+  const [year, month, day] = iso.slice(0, 10).split('-').map(Number)
+  if (!year || !month || !day) return ''
   return new Date(year, month - 1, day).toLocaleDateString('en-PH', {
     month: 'short',
     day: 'numeric',
