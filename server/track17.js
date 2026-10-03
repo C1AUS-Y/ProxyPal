@@ -1,5 +1,6 @@
 const TRACK17_KEY = process.env.TRACK17_KEY
 const BASE_URL = 'https://api.17track.net/track/v2.4'
+const CARRIER_LIST_URL = 'https://res.17track.net/asset/carrier/info/apicarrier.all.json'
 
 const STATUS_MAP = {
   NotFound: 'ordered',
@@ -38,38 +39,77 @@ async function call(endpoint, body) {
 
   const data = await response.json()
 
-  if (!response.ok) throw new Error(data?.message || `17track returned ${response.status}`)
+  if (!response.ok) {
+    throw new Error(data?.message || `17track returned ${response.status}`)
+  }
 
   return data
 }
 
-export async function registerNumber(number) {
+export async function getCarriers() {
+  const response = await fetch(CARRIER_LIST_URL)
+
+  if (!response.ok) {
+    throw new Error(`carrier list returned ${response.status}`)
+  }
+
+  const data = await response.json()
+
+  return Array.isArray(data) ? data : data.data || []
+}
+
+export async function registerNumber(number, carrier = null) {
   if (!number) return null
 
-  const result = await call('register', [{
-    number,
+  const item = {
+    number: number.trim(),
     lang: 'en',
     translation_mode: 'UseThirdPartyServices',
-  }])
+  }
+
+  if (carrier) {
+    item.carrier = Number(carrier)
+  }
+
+  const result = await call('register', [item])
 
   const accepted = result.data?.accepted?.[0]
   const rejected = result.data?.rejected?.[0]
 
-  if (rejected) throw new Error(rejected.error?.message || '17track rejected the tracking number')
+  if (accepted) {
+    return accepted
+  }
 
-  return accepted || null
+  if (rejected) {
+    const error = new Error(
+      rejected.error?.message || '17track rejected the tracking number'
+    )
+
+    error.code = rejected.error?.code
+    error.trackingNumber = rejected.number
+
+    throw error
+  }
+
+  return null
 }
 
-export async function getStatus(number) {
+export async function getStatus(number, carrier = null) {
   if (!number) return null
 
-  const result = await call('gettrackinfo', [{
-    number,
+  const item = {
+    number: number.trim(),
     lang: 'en',
     translation_mode: 'UseThirdPartyServices',
-  }])
+  }
 
+  if (carrier) {
+    item.carrier = Number(carrier)
+  }
+
+  const result = await call('gettrackinfo', [item])
   const accepted = result.data?.accepted?.[0]
+
   if (!accepted) return null
 
   const trackInfo = accepted.track_info
@@ -79,20 +119,26 @@ export async function getStatus(number) {
   const events = providers.flatMap(provider =>
     (provider.events || []).map(event => ({
       label: EVENT_LABELS[event.stage] || event.stage || 'Tracking update',
-      description: event.description_translation?.description || event.description || '',
+      description:
+        event.description_translation?.description ||
+        event.description ||
+        '',
       date: event.time_iso ? event.time_iso.slice(0, 10) : null,
       time: event.time_iso || null,
-      location: event.location || '',
+      location: event.location || event.address || '',
       stage: event.stage || '',
       subStatus: event.sub_status || '',
     }))
   )
 
-  events.sort((a, b) => new Date(a.time || 0) - new Date(b.time || 0))
+  events.sort(
+    (a, b) => new Date(a.time || 0).getTime() - new Date(b.time || 0).getTime()
+  )
 
   return {
     status: STATUS_MAP[rawStatus] || 'ordered',
     rawStatus: rawStatus || null,
     events,
+    carrier: accepted.carrier || carrier || null,
   }
 }
