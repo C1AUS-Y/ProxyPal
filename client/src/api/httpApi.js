@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabaseClient.js'
 
-const BASE = import.meta.env.VITE_API_BASE_URL || ''
+const BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 
 const labels = ['Ordered', 'Shipped', 'In Transit', 'Delivered']
 const values = ['ordered', 'shipped', 'in_transit', 'delivered']
