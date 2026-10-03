@@ -3,7 +3,7 @@
 ProxyPal is a web app for people who buy through proxy shopping services, whether for themselves or on behalf of someone else. It tracks orders, items, payments, the balance still owed, and package status in one place, replacing the spreadsheet most people use for this.
 
 - **Live site:** https://c1aus-y.github.io/ProxyPal/
-- **API health check:** todo
+- **API health check:** https://proxypal-aggn.onrender.com/healthz
 - **Demo video:** todo
 
 ## Features
