@@ -9,18 +9,16 @@ const app = express()
 
 const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:5173')
   .split(',')
-  .map((origin) => origin.trim())
+  .map(origin => origin.trim())
   .filter(Boolean)
 
 app.use(cors({ origin: allowedOrigins }))
 app.use(express.json({ limit: '100kb' }))
 
-// just checks the server process itself is alive
 app.get('/healthz', (request, response) => {
   response.json({ ok: true })
 })
 
-// checks the db connection
 app.get('/readyz', async (request, response) => {
   try {
     await pool.query('SELECT 1')
@@ -31,18 +29,19 @@ app.get('/readyz', async (request, response) => {
   }
 })
 
-// validating on the server because the client side form can be skipped/bypassed
 function validateOrder(body) {
   const errors = []
   const proxyName = typeof body.proxyName === 'string' ? body.proxyName.trim() : ''
   const platform = typeof body.platform === 'string' ? body.platform.trim() : ''
   const recipient = typeof body.recipient === 'string' ? body.recipient.trim() : 'Me'
   const items = Array.isArray(body.items) ? body.items : []
+  const trackingCarrier = body.trackingCarrier ? Number(body.trackingCarrier) : null
 
   if (!proxyName) errors.push('proxyName is required')
   if (proxyName.length > 120) errors.push('proxyName must be 120 characters or fewer')
   if (!platform) errors.push('platform is required')
   if (recipient.length > 120) errors.push('recipient must be 120 characters or fewer')
+  if (trackingCarrier !== null && !Number.isInteger(trackingCarrier)) errors.push('trackingCarrier must be a valid carrier code')
 
   const cleanItems = items.map((item, index) => {
     const name = typeof item.name === 'string' ? item.name.trim() : ''
@@ -64,6 +63,7 @@ function validateOrder(body) {
       recipient,
       orderDate: body.orderDate || null,
       trackingNumber: typeof body.trackingNumber === 'string' ? body.trackingNumber.trim() || null : null,
+      trackingCarrier,
       status: body.status || 'ordered',
       notes: typeof body.notes === 'string' ? body.notes.trim() || null : null,
       items: cleanItems,
@@ -71,29 +71,19 @@ function validateOrder(body) {
   }
 }
 
-async function syncTracking(userId, orderId, number) {
+async function syncTracking(userId, orderId, number, carrier = null) {
   if (!number) return
 
   try {
-    await track17.registerNumber(number)
-  } catch (error) {
-    console.error('17track registration:', error.message)
-  }
-
-  try {
-    const result = await track17.getStatus(number)
+    const accepted = await track17.registerNumber(number, carrier)
+    const detectedCarrier = accepted?.carrier || carrier
+    const result = await track17.getStatus(number, detectedCarrier)
 
     if (result) {
-      await orders.setTracking(
-        pool,
-        userId,
-        orderId,
-        result.status,
-        result.events
-      )
+      await orders.setTracking(pool, userId, orderId, result.status, result.events, result.carrier || detectedCarrier)
     }
   } catch (error) {
-    console.error('17track status check failed:', error.message)
+    console.error('17track sync failed:', error.message)
   }
 }
 
@@ -134,15 +124,24 @@ app.get('/api/orders/:id', async (request, response, next) => {
   }
 })
 
+app.get('/api/carriers', async (request, response, next) => {
+  try {
+    const result = await pool.query(
+      'SELECT code, name, country, alias FROM carriers ORDER BY name'
+    )
+    response.json(result.rows)
+  } catch (error) {
+    next(error)
+  }
+})
+
 app.post('/api/orders', async (request, response, next) => {
   const { errors, value } = validateOrder(request.body ?? {})
   if (errors.length > 0) return response.status(400).json({ error: errors.join('; ') })
 
   try {
     const order = await orders.create(pool, request.userId, value)
-
-    syncTracking(request.userId, order.id, value.trackingNumber)
-
+    syncTracking(request.userId, order.id, value.trackingNumber, value.trackingCarrier)
     response.status(201).json(order)
   } catch (error) {
     next(error)
@@ -161,7 +160,7 @@ app.put('/api/orders/:id', async (request, response, next) => {
     if (!order) return response.status(404).json({ error: 'Not found' })
 
     if (value.trackingNumber) {
-      syncTracking(request.userId, order.id, value.trackingNumber)
+      syncTracking(request.userId, order.id, value.trackingNumber, value.trackingCarrier)
     }
 
     response.json(order)
@@ -193,28 +192,27 @@ app.post('/api/orders/:id/payments', async (request, response, next) => {
   }
 })
 
-// registers the order's tracking number with 17track
 app.post('/api/orders/:id/tracking', async (request, response, next) => {
   try {
-    const number = await orders.getTrackingNumber(pool, request.userId, request.params.id)
-    if (number === null) return response.status(404).json({ error: 'Not found' })
-    if (!number) return response.status(400).json({ error: 'This order has no tracking number' })
+    const tracking = await orders.getTrackingInfo(pool, request.userId, request.params.id)
+    if (!tracking) return response.status(404).json({ error: 'Not found' })
+    if (!tracking.tracking_number) return response.status(400).json({ error: 'This order has no tracking number' })
 
-    const accepted = await track17.registerNumber(number)
-    response.status(202).json({ registered: Boolean(accepted), carrier: accepted?.carrier ?? null })
+    const accepted = await track17.registerNumber(tracking.tracking_number, tracking.tracking_carrier)
+    response.status(202).json({ registered: Boolean(accepted), carrier: accepted?.carrier ?? tracking.tracking_carrier ?? null })
   } catch (error) {
     next(error)
   }
 })
 
-// gets the latest status from 17track and saves it on the order
 app.get('/api/orders/:id/tracking', async (request, response, next) => {
   try {
-    const number = await orders.getTrackingNumber(pool, request.userId, request.params.id)
-    if (number === null) return response.status(404).json({ error: 'Not found' })
-    if (!number) return response.status(400).json({ error: 'This order has no tracking number' })
+    const tracking = await orders.getTrackingInfo(pool, request.userId, request.params.id)
+    if (!tracking) return response.status(404).json({ error: 'Not found' })
+    if (!tracking.tracking_number) return response.status(400).json({ error: 'This order has no tracking number' })
 
-    const result = await track17.getStatus(number)
+    const result = await track17.getStatus(tracking.tracking_number, tracking.tracking_carrier)
+
     if (!result) return response.json({ status: 'ordered', events: [] })
 
     await orders.setTracking(
@@ -222,7 +220,8 @@ app.get('/api/orders/:id/tracking', async (request, response, next) => {
       request.userId,
       request.params.id,
       result.status,
-      result.events
+      result.events,
+      result.carrier
     )
 
     response.json(result)
