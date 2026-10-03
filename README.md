@@ -19,7 +19,7 @@ The remaining balance is always calculated from the items and payments (items to
 
 ## Built with
 
-React, Vite and Tailwind CSS on the front end. Express on the back end. PostgreSQL hosted on Supabase, with Supabase Auth for login. Package tracking comes from the 17TRACK API. A Supabase Edge Function receives 17TRACK's tracking webhooks and saves the new status, so tracking updates arrive without anyone re-saving an order. The client is hosted on GitHub Pages and the database on Supabase.
+React, Vite and Tailwind CSS on the front end. Express on the back end. PostgreSQL hosted on Supabase, with Supabase Auth for login. Package tracking comes from the 17TRACK API. A Supabase Edge Function receives 17TRACK's tracking webhooks and saves the new status, so tracking updates arrive without anyone re-saving an order. The client is hosted on GitHub Pages, the API is hosted on Render, and the database on Supabase.
 
 ## Architecture
 
