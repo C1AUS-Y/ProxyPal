@@ -135,6 +135,16 @@ app.get('/api/carriers', async (request, response, next) => {
   }
 })
 
+app.post('/api/carriers/sync', async (request, response, next) => {
+  try {
+    const data = await track17.getCarrierList()
+    console.log(JSON.stringify(data).slice(0, 3000))
+    response.json({ success: true, data })
+  } catch (error) {
+    next(error)
+  }
+})
+
 app.post('/api/orders', async (request, response, next) => {
   const { errors, value } = validateOrder(request.body ?? {})
   if (errors.length > 0) return response.status(400).json({ error: errors.join('; ') })
