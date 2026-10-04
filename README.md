@@ -156,14 +156,9 @@ The server validates all input itself, because a browser form can be bypassed.
 
 ## Screenshots
 
-<!-- to add screenshots -->
-
 | Dashboard | Orders | Order detail |
-| --- | --- | --- |
-| <img width="1919" height="908" alt="image" src="https://github.com/user-attachments/assets/ebbd8582-f0c8-479c-a79b-0cc0aefa1edc" />
- | <img width="1895" height="897" alt="image" src="https://github.com/user-attachments/assets/2e7b32cf-c3a7-4da6-bd8d-c7f7ded1aa57" />
- | <img width="1884" height="897" alt="image" src="https://github.com/user-attachments/assets/4b8aa965-6b59-4e62-91c2-13aa4d201eca" />
- |
+| :---: | :---: | :---: |
+| ![Dashboard](https://github.com/user-attachments/assets/ebbd8582-f0c8-479c-a79b-0cc0aefa1edc) | ![Orders](https://github.com/user-attachments/assets/2e7b32cf-c3a7-4da6-bd8d-c7f7ded1aa57) | ![Order detail](https://github.com/user-attachments/assets/4b8aa965-6b59-4e62-91c2-13aa4d201eca) |
 
 ## Known issues and next steps
 
