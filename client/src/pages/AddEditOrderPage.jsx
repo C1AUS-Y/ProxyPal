@@ -33,8 +33,6 @@ function saveCountry(code) {
   }
 }
 
-const carrierLabel = carrier => `${carrier.name} [${carrier.code}]`
-
 function CarrierPicker({ value, trackingNumber, onChange }) {
   const [suggestions, setSuggestions] = useState([])
   const [query, setQuery] = useState('')
@@ -126,16 +124,10 @@ function CarrierPicker({ value, trackingNumber, onChange }) {
     return () => clearTimeout(timer)
   }, [query, country])
 
-  function handleQuery(text) {
-    const hit = results.find(carrier => carrierLabel(carrier) === text)
-
-    if (hit) {
-      onChange(hit)
-      setQuery('')
-      setResults([])
-    } else {
-      setQuery(text)
-    }
+  function pickCarrier(carrier) {
+    onChange(carrier)
+    setQuery('')
+    setResults([])
   }
 
   return (
@@ -177,17 +169,32 @@ function CarrierPicker({ value, trackingNumber, onChange }) {
           )}
 
           <Input
-            list="carrier-options"
             placeholder={country ? 'search couriers in this country...' : 'or search for a courier...'}
             value={query}
-            onChange={e => handleQuery(e.target.value)}
+            onChange={e => setQuery(e.target.value)}
+            autoComplete="off"
           />
 
-          <datalist id="carrier-options">
-            {results.map(carrier => (
-              <option key={carrier.code} value={carrierLabel(carrier)} />
-            ))}
-          </datalist>
+          {results.length > 0 && (
+            <ul className="max-h-60 overflow-y-auto rounded-2xl bg-text/[0.05] p-1">
+              {results.map(carrier => (
+                <li key={carrier.code}>
+                  <button
+                    type="button"
+                    onClick={() => pickCarrier(carrier)}
+                    className="flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-left text-body hover:bg-accent/60"
+                  >
+                    <span>{carrier.name}</span>
+                    {carrier.country && <span className="text-small text-primary">{carrier.country}</span>}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {query.trim().length >= 2 && results.length === 0 && !lookupError && (
+            <p className="pl-1 text-small text-primary">no couriers found. try a shorter name or another country.</p>
+          )}
         </>
       )}
 
