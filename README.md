@@ -156,7 +156,7 @@ The server validates all input itself, because a browser form can be bypassed.
 
 ## Screenshots
 
-### Getting in
+### Profile set up
 
 | Login | Sign up | Profile |
 | :---: | :---: | :---: |
