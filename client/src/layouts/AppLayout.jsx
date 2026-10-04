@@ -5,7 +5,6 @@ import TabBar from '../components/organisms/TabBar.jsx'
 import Button from '../components/atoms/Button.jsx'
 import { useOrders } from '../orders/OrdersContext.jsx'
 
-// Placeholder shapes shown while the orders load, so the screen does not jump.
 function LoadingSkeleton({ slow }) {
   return (
     <div role="status" className="flex flex-col gap-6">
@@ -30,7 +29,6 @@ export default function AppLayout() {
   const { status, error, slow, reload } = useOrders()
   const { pathname } = useLocation()
 
-  // The floating "new order" button lives on the two list screens.
   const showFab = status === 'ready' && (pathname === '/' || pathname === '/orders')
 
   return (
@@ -44,12 +42,8 @@ export default function AppLayout() {
       <TopBar />
       <TabBar />
 
-      {/* md:pl-28 leaves room for the floating dock on wider screens. */}
       <div className="md:pl-28">
         <main id="main" className="mx-auto w-full max-w-5xl px-4 pb-32 pt-4 md:pb-12">
-          {/* Four states, not two: loading, error, empty and data are different
-              screens. Empty is handled by each page; the first two live here
-              because every page needs the orders before it can draw anything. */}
           {status === 'loading' && <LoadingSkeleton slow={slow} />}
 
           {status === 'error' && (

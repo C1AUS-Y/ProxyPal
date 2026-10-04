@@ -129,7 +129,6 @@ export default function OrderDetailPage() {
         <BackLink to="/orders">Orders</BackLink>
       </div>
 
-      {/* One column on a phone, two from 768px: order + items, then payments + tracking. */}
       <div className="flex flex-col gap-4 md:grid md:grid-cols-2 md:items-start md:gap-6">
         <div className="flex flex-col gap-4">
           <section className={CARD} aria-labelledby="order-heading" style={{ '--i': 1 }}>
