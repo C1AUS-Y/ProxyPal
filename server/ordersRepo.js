@@ -27,6 +27,15 @@ export async function getById(pool, userId, id) {
   return { ...order, items: itemsResult.rows, payments: paymentsResult.rows }
 }
 
+async function insertItems(client, orderId, items) {
+  for (const item of items ?? []) {
+    await client.query(
+      'INSERT INTO items (order_id, name, price, quantity) VALUES ($1, $2, $3, $4)',
+      [orderId, item.name, item.price, item.quantity ?? 1]
+    )
+  }
+}
+
 export async function create(pool, userId, { proxyName, platform, recipient, orderDate, trackingNumber, trackingCarrier, status, notes, items }) {
   const client = await pool.connect()
   try {
@@ -40,13 +49,7 @@ export async function create(pool, userId, { proxyName, platform, recipient, ord
     )
 
     const order = orderResult.rows[0]
-
-    for (const item of items ?? []) {
-      await client.query(
-        `INSERT INTO items (order_id, name, price, quantity) VALUES ($1, $2, $3, $4)`,
-        [order.id, item.name, item.price, item.quantity ?? 1]
-      )
-    }
+    await insertItems(client, order.id, items)
 
     await client.query('COMMIT')
     return await getById(pool, userId, order.id)
@@ -72,21 +75,13 @@ export async function update(pool, userId, id, { proxyName, platform, recipient,
       [proxyName, platform, recipient ?? 'Me', orderDate ?? null, trackingNumber ?? null, trackingCarrier ?? null, notes ?? null, id, userId]
     )
 
-    const order = orderResult.rows[0]
-
-    if (!order) {
+    if (!orderResult.rows[0]) {
       await client.query('ROLLBACK')
       return null
     }
 
     await client.query('DELETE FROM items WHERE order_id = $1', [id])
-
-    for (const item of items ?? []) {
-      await client.query(
-        `INSERT INTO items (order_id, name, price, quantity) VALUES ($1, $2, $3, $4)`,
-        [id, item.name, item.price, item.quantity ?? 1]
-      )
-    }
+    await insertItems(client, id, items)
 
     await client.query('COMMIT')
     return await getById(pool, userId, id)
@@ -106,17 +101,12 @@ export async function remove(pool, userId, id) {
   return result.rowCount > 0
 }
 
-async function assertOwnedOrder(pool, userId, orderId) {
-  const result = await pool.query(
+export async function addPayment(pool, userId, orderId, { amount, paidOn, method, note }) {
+  const owned = await pool.query(
     'SELECT id FROM orders WHERE id = $1 AND user_id = $2',
     [orderId, userId]
   )
-  return result.rows[0] ?? null
-}
-
-export async function addPayment(pool, userId, orderId, { amount, paidOn, method, note }) {
-  const owned = await assertOwnedOrder(pool, userId, orderId)
-  if (!owned) return null
+  if (!owned.rows[0]) return null
 
   await pool.query(
     `INSERT INTO payments (order_id, amount, paid_on, method, note)
@@ -128,34 +118,17 @@ export async function addPayment(pool, userId, orderId, { amount, paidOn, method
 }
 
 export async function getTrackingInfo(pool, userId, orderId) {
-  const owned = await assertOwnedOrder(pool, userId, orderId)
-  if (!owned) return null
-
   const result = await pool.query(
-    'SELECT tracking_number, tracking_carrier FROM orders WHERE id = $1',
-    [orderId]
+    'SELECT tracking_number, tracking_carrier FROM orders WHERE id = $1 AND user_id = $2',
+    [orderId, userId]
   )
-
-  return result.rows[0]
-}
-
-export async function getTrackingNumber(pool, userId, orderId) {
-  const tracking = await getTrackingInfo(pool, userId, orderId)
-  return tracking ? tracking.tracking_number : null
+  return result.rows[0] ?? null
 }
 
 export async function setTracking(pool, userId, orderId, status, events, carrier = null) {
   const result = await pool.query(
     'UPDATE orders SET status = $1, tracking_events = $2, tracking_carrier = COALESCE($3, tracking_carrier) WHERE id = $4 AND user_id = $5 RETURNING *',
     [status, JSON.stringify(events ?? []), carrier, orderId, userId]
-  )
-  return result.rows[0] ?? null
-}
-
-export async function setStatus(pool, userId, orderId, status) {
-  const result = await pool.query(
-    'UPDATE orders SET status = $1 WHERE id = $2 AND user_id = $3 RETURNING *',
-    [status, orderId, userId]
   )
   return result.rows[0] ?? null
 }

@@ -80,13 +80,11 @@ async function call(endpoint, body, attempt = 0) {
     })
   )
 
-  // read as text first: a rate-limit or gateway error is not always JSON
   const text = await response.text()
   let data = null
   try {
     data = JSON.parse(text)
   } catch {
-    // not JSON
   }
 
   const retryable = response.status === 429

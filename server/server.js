@@ -16,20 +16,21 @@ const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:5173')
 app.use(cors({ origin: allowedOrigins }))
 app.use(express.json({ limit: '100kb' }))
 
-app.get('/healthz', (request, response) => {
-  response.json({ ok: true })
+app.get('/healthz', (req, res) => {
+  res.json({ ok: true })
 })
 
-app.get('/readyz', async (request, response) => {
+app.get('/readyz', async (req, res) => {
   try {
     await pool.query('SELECT 1')
-    response.json({ ok: true, db: 'up' })
+    res.json({ ok: true, db: 'up' })
   } catch (error) {
     console.error('readyz failed:', error.message)
-    response.status(503).json({ ok: false, db: 'down' })
+    res.status(503).json({ ok: false, db: 'down' })
   }
 })
 
+//cleans input and checks if its valid
 function validateOrder(body) {
   const errors = []
   const proxyName = typeof body.proxyName === 'string' ? body.proxyName.trim() : ''
@@ -72,6 +73,7 @@ function validateOrder(body) {
   }
 }
 
+// where courier suggestion n registration happens
 async function syncTracking(userId, orderId, number, carrier = null) {
   if (!number) return
 
@@ -110,151 +112,152 @@ function validatePayment(body) {
 
 app.use('/api', requireAuth)
 
-app.get('/api/orders', async (request, response, next) => {
+app.get('/api/orders', async (req, res, next) => {
   try {
-    response.json(await orders.getAll(pool, request.userId))
+    res.json(await orders.getAll(pool, req.userId))
   } catch (error) {
     next(error)
   }
 })
 
-app.get('/api/orders/:id', async (request, response, next) => {
+app.get('/api/orders/:id', async (req, res, next) => {
   try {
-    const order = await orders.getById(pool, request.userId, request.params.id)
-    if (!order) return response.status(404).json({ error: 'Not found' })
-    response.json(order)
+    const order = await orders.getById(pool, req.userId, req.params.id)
+    if (!order) return res.status(404).json({ error: 'Not found' })
+    res.json(order)
   } catch (error) {
     next(error)
   }
 })
 
 // all carrier routes read the bundled carriers.json: free, no 17track call
-app.get('/api/carriers', (request, response) => {
-  const { q, code, country } = request.query
-  if (code) return response.json([getCarrier(code)].filter(Boolean))
-  response.json(searchCarriers(q, 20, country))
+app.get('/api/carriers', (req, res) => {
+  const { q, code, country } = req.query
+  if (code) return res.json([getCarrier(code)].filter(Boolean))
+  res.json(searchCarriers(q, 20, country))
 })
 
-app.get('/api/carriers/countries', (request, response) => {
-  response.json(listCountries())
+app.get('/api/carriers/countries', (req, res) => {
+  res.json(listCountries())
 })
 
-app.get('/api/carriers/suggest', (request, response) => {
-  const number = typeof request.query.number === 'string' ? request.query.number : ''
-  const { carrier, suggestions } = matchCarrier(number, request.query.country)
-  response.json({ matched: carrier, suggestions })
+app.get('/api/carriers/suggest', (req, res) => {
+  const number = typeof req.query.number === 'string' ? req.query.number : ''
+  const { carrier, suggestions } = matchCarrier(number, req.query.country)
+  res.json({ matched: carrier, suggestions })
 })
 
-app.post('/api/orders', async (request, response, next) => {
-  const { errors, value } = validateOrder(request.body ?? {})
-  if (errors.length > 0) return response.status(400).json({ error: errors.join('; ') })
+app.post('/api/orders', async (req, res, next) => {
+  const { errors, value } = validateOrder(req.body ?? {})
+  if (errors.length > 0) return res.status(400).json({ error: errors.join('; ') })
 
   try {
-    const order = await orders.create(pool, request.userId, value)
-    syncTracking(request.userId, order.id, value.trackingNumber, value.trackingCarrier)
-    response.status(201).json(order)
+    const order = await orders.create(pool, req.userId, value)
+    syncTracking(req.userId, order.id, value.trackingNumber, value.trackingCarrier)
+    res.status(201).json(order)
   } catch (error) {
     next(error)
   }
 })
 
-app.put('/api/orders/:id', async (request, response, next) => {
-  const { errors, value } = validateOrder(request.body ?? {})
-  if (errors.length > 0) return response.status(400).json({ error: errors.join('; ') })
+app.put('/api/orders/:id', async (req, res, next) => {
+  const { errors, value } = validateOrder(req.body ?? {})
+  if (errors.length > 0) return res.status(400).json({ error: errors.join('; ') })
 
   try {
-    const before = await orders.getTrackingInfo(pool, request.userId, request.params.id)
-    if (!before) return response.status(404).json({ error: 'Not found' })
+    const before = await orders.getTrackingInfo(pool, req.userId, req.params.id)
+    if (!before) return res.status(404).json({ error: 'Not found' })
 
-    const order = await orders.update(pool, request.userId, request.params.id, value)
-    if (!order) return response.status(404).json({ error: 'Not found' })
+    const order = await orders.update(pool, req.userId, req.params.id, value)
+    if (!order) return res.status(404).json({ error: 'Not found' })
 
     const changed =
       value.trackingNumber !== (before.tracking_number ?? null) ||
       Number(value.trackingCarrier ?? 0) !== Number(before.tracking_carrier ?? 0)
 
     if (value.trackingNumber && changed) {
-      syncTracking(request.userId, order.id, value.trackingNumber, value.trackingCarrier)
+      syncTracking(req.userId, order.id, value.trackingNumber, value.trackingCarrier)
     }
 
-    response.json(order)
+    res.json(order)
   } catch (error) {
     next(error)
   }
 })
 
-app.delete('/api/orders/:id', async (request, response, next) => {
+app.delete('/api/orders/:id', async (req, res, next) => {
   try {
-    const removed = await orders.remove(pool, request.userId, request.params.id)
-    if (!removed) return response.status(404).json({ error: 'Not found' })
-    response.status(204).end()
+    const removed = await orders.remove(pool, req.userId, req.params.id)
+    if (!removed) return res.status(404).json({ error: 'Not found' })
+    res.status(204).end()
   } catch (error) {
     next(error)
   }
 })
 
-app.post('/api/orders/:id/payments', async (request, response, next) => {
-  const { errors, value } = validatePayment(request.body ?? {})
-  if (errors.length > 0) return response.status(400).json({ error: errors.join('; ') })
+app.post('/api/orders/:id/payments', async (req, res, next) => {
+  const { errors, value } = validatePayment(req.body ?? {})
+  if (errors.length > 0) return res.status(400).json({ error: errors.join('; ') })
 
   try {
-    const payment = await orders.addPayment(pool, request.userId, request.params.id, value)
-    if (!payment) return response.status(404).json({ error: 'Not found' })
-    response.status(201).json(payment)
+    const payment = await orders.addPayment(pool, req.userId, req.params.id, value)
+    if (!payment) return res.status(404).json({ error: 'Not found' })
+    res.status(201).json(payment)
   } catch (error) {
     next(error)
   }
 })
 
-app.post('/api/orders/:id/tracking', async (request, response, next) => {
+app.post('/api/orders/:id/tracking', async (req, res, next) => {
   try {
-    const tracking = await orders.getTrackingInfo(pool, request.userId, request.params.id)
-    if (!tracking) return response.status(404).json({ error: 'Not found' })
-    if (!tracking.tracking_number) return response.status(400).json({ error: 'This order has no tracking number' })
+    const tracking = await orders.getTrackingInfo(pool, req.userId, req.params.id)
+    if (!tracking) return res.status(404).json({ error: 'Not found' })
+    if (!tracking.tracking_number) return res.status(400).json({ error: 'This order has no tracking number' })
 
     const { result, carrier, needsCarrier, suggestions } = await trackIfMatched(tracking.tracking_number, tracking.tracking_carrier)
 
     if (needsCarrier) {
-      return response.status(422).json({ error: 'Pick the courier for this order first', needsCarrier: true, suggestions })
+      return res.status(422).json({ error: 'Pick the courier for this order first', needsCarrier: true, suggestions })
     }
 
-    if (carrier && !tracking.tracking_carrier) await orders.setCarrier(pool, request.userId, request.params.id, carrier)
-    if (result) await orders.setTracking(pool, request.userId, request.params.id, result.status, result.events, carrier)
+    if (carrier && !tracking.tracking_carrier) await orders.setCarrier(pool, req.userId, req.params.id, carrier)
+    if (result) await orders.setTracking(pool, req.userId, req.params.id, result.status, result.events, carrier)
 
-    response.status(202).json({ registered: true, carrier })
+    res.status(202).json({ registered: true, carrier })
   } catch (error) {
     next(error)
   }
 })
 
-app.get('/api/orders/:id/tracking', async (request, response, next) => {
+app.get('/api/orders/:id/tracking', async (req, res, next) => {
   try {
-    const tracking = await orders.getTrackingInfo(pool, request.userId, request.params.id)
-    if (!tracking) return response.status(404).json({ error: 'Not found' })
-    if (!tracking.tracking_number) return response.status(400).json({ error: 'This order has no tracking number' })
+    const tracking = await orders.getTrackingInfo(pool, req.userId, req.params.id)
+    if (!tracking) return res.status(404).json({ error: 'Not found' })
+    if (!tracking.tracking_number) return res.status(400).json({ error: 'This order has no tracking number' })
 
     if (!tracking.tracking_carrier) {
       const suggestions = suggestCarriers(tracking.tracking_number)
-      return response.json({ status: 'ordered', events: [], needsCarrier: true, suggestions })
+      return res.json({ status: 'ordered', events: [], needsCarrier: true, suggestions })
     }
 
     const result = await track17.getStatus(tracking.tracking_number, tracking.tracking_carrier)
-    if (!result) return response.json({ status: 'ordered', events: [] })
+    if (!result) return res.json({ status: 'ordered', events: [] })
 
-    await orders.setTracking(pool, request.userId, request.params.id, result.status, result.events, result.carrier)
-    response.json(result)
+    await orders.setTracking(pool, req.userId, req.params.id, result.status, result.events, result.carrier)
+    res.json(result)
   } catch (error) {
     next(error)
   }
 })
 
-app.use((request, response) => {
-  response.status(404).json({ error: 'No such route' })
+app.use((req, res) => {
+  res.status(404).json({ error: 'No such route' })
 })
 
-app.use((error, request, response, next) => {
+//this is whree next error automatically goes to if u call next(error). skips everythin else
+app.use((error, req, res, next) => {
   console.error(error)
-  response.status(500).json({ error: 'Something went wrong on the server' })
+  res.status(500).json({ error: 'Something went wrong on the server' })
 })
 
 const port = process.env.PORT || 3000
