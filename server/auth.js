@@ -1,5 +1,9 @@
 // checks the Supabase login token the client sends and gets the user id from it
 
+
+// verifies the token here with supabase's public keys
+// jose caches the keys so its fast, getUser() works too but its slower + might fail if supabase isnt online
+
 import { createRemoteJWKSet, jwtVerify } from 'jose'
 
 const SUPABASE_URL = process.env.SUPABASE_URL

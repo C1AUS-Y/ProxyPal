@@ -36,6 +36,7 @@ async function insertItems(client, orderId, items) {
   }
 }
 
+//creates orders
 export async function create(pool, userId, { proxyName, platform, recipient, orderDate, trackingNumber, trackingCarrier, status, notes, items }) {
   const client = await pool.connect()
   try {
