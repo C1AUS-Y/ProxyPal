@@ -1,6 +1,7 @@
 const TRACK17_KEY = process.env.TRACK17_KEY
 const BASE_URL = 'https://api.17track.net/track/v2.4'
 
+// 17track statuses -> the statuses our app uses
 const STATUS_MAP = {
   NotFound: 'ordered',
   InfoReceived: 'ordered',
@@ -24,115 +25,76 @@ const EVENT_LABELS = {
   Expired: 'Tracking expired',
 }
 
-const CARRIER_LIST_URL = 'https://res.17track.net/asset/carrier/info/apicarrier.all.json'
-
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 
-const MIN_GAP_MS = 400
-const MAX_RETRIES = 2
 let queue = Promise.resolve()
-let lastCallAt = 0
 
 function throttled(task) {
-  const run = queue.then(async () => {
-    const wait = lastCallAt + MIN_GAP_MS - Date.now()
-    if (wait > 0) await sleep(wait)
-    try {
-      return await task()
-    } finally {
-      lastCallAt = Date.now()
+  const result = queue.then(task)
+  queue = result.catch(() => {}).then(() => sleep(400)) //17Ttrack only allows 3 req per sec, to prevent too many request err, added 400ms pause
+  return result
+}
+
+async function callApi(endpoint, body) {
+  if (!TRACK17_KEY) throw new Error('TRACK17_KEY is not configured')
+
+  for (let attempt = 0; attempt <= 2; attempt++) {
+    const res = await throttled(() =>
+      fetch(`${BASE_URL}/${endpoint}`, {
+        method: 'POST',
+        headers: { '17token': TRACK17_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+    )
+
+    if (res.status === 429 && attempt < 2) {
+      await sleep(1000 * (attempt + 1))
+      continue
     }
-  })
-  queue = run.catch(() => {})
-  return run
+
+    const text = await res.text()
+    let data
+    try {
+      data = JSON.parse(text)
+    } catch {
+      throw new Error(`17track returned a non-JSON reply (HTTP ${res.status}): ${text.slice(0, 200)}`)
+    }
+
+    if (!res.ok) throw new Error(data.message || `17track returned ${res.status}`)
+    return data
+  }
+}
+
+function makeItem(number, carrier) {
+  const item = { number: number.trim(), lang: 'en', translation_mode: 'UseThirdPartyServices' }
+  if (carrier) item.carrier = Number(carrier)
+  return item
 }
 
 function formatLocation(event) {
-  if (typeof event.location === 'string' && event.location) return event.location
+  if (event.location) return event.location
 
   const address = event.address
+  if (!address) return ''
   if (typeof address === 'string') return address
-  if (address && typeof address === 'object') {
-    return [address.city, address.state, address.country]
-      .filter(part => typeof part === 'string' && part)
-      .join(', ')
-  }
-
-  return ''
-}
-
-async function call(endpoint, body, attempt = 0) {
-  if (!TRACK17_KEY) throw new Error('TRACK17_KEY is not configured')
-
-  if (process.env.TRACK17_DRY_RUN === '1') {
-    console.log(`[dry run] would call ${endpoint}:`, JSON.stringify(body))
-    return { code: 0, data: { accepted: [], rejected: [] } }
-  }
-
-  const response = await throttled(() =>
-    fetch(`${BASE_URL}/${endpoint}`, {
-      method: 'POST',
-      headers: {
-        '17token': TRACK17_KEY,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    })
-  )
-
-  const text = await response.text()
-  let data = null
-  try {
-    data = JSON.parse(text)
-  } catch {
-  }
-
-  const retryable = response.status === 429
-  if (retryable && attempt < MAX_RETRIES) {
-    await sleep(1000 * (attempt + 1))
-    return call(endpoint, body, attempt + 1)
-  }
-
-  if (data === null) {
-    throw new Error(`17track returned a non-JSON reply (HTTP ${response.status}): ${text.slice(0, 200)}`)
-  }
-
-  if (!response.ok) throw new Error(data?.message || `17track returned ${response.status}`)
-
-  return data
-}
-
-function isAlreadyRegistered(error) {
-  if (!error) return false
-  return error.code === -18019901 || /already\s+registered/i.test(error.message || '')
+  return [address.city, address.state, address.country].filter(Boolean).join(', ')
 }
 
 export async function registerNumber(number, carrier = null) {
   if (!number) return null
 
-  const item = {
-    number: number.trim(),
-    lang: 'en',
-    translation_mode: 'UseThirdPartyServices',
-  }
-
-  if (carrier) item.carrier = Number(carrier)
-
-  const result = await call('register', [item])
+  const result = await callApi('register', [makeItem(number, carrier)])
   const accepted = result.data?.accepted?.[0]
   const rejected = result.data?.rejected?.[0]
 
   if (accepted) return accepted
 
-  if (rejected && isAlreadyRegistered(rejected.error)) {
-    return { number: rejected.number, carrier: carrier ? Number(carrier) : null, alreadyRegistered: true }
-  }
-
   if (rejected) {
-    const error = new Error(rejected.error?.message || '17track rejected the tracking number')
-    error.code = rejected.error?.code
-    error.trackingNumber = rejected.number
-    throw error
+    const message = rejected.error?.message || ''
+    if (rejected.error?.code === -18019901 || /already\s+registered/i.test(message)) {
+      return { alreadyRegistered: true }
+    }
+    throw new Error(message || '17track rejected the tracking number')
   }
 
   return null
@@ -141,17 +103,8 @@ export async function registerNumber(number, carrier = null) {
 export async function getStatus(number, carrier = null) {
   if (!number) return null
 
-  const item = {
-    number: number.trim(),
-    lang: 'en',
-    translation_mode: 'UseThirdPartyServices',
-  }
-
-  if (carrier) item.carrier = Number(carrier)
-
-  const result = await call('gettrackinfo', [item])
+  const result = await callApi('gettrackinfo', [makeItem(number, carrier)])
   const accepted = result.data?.accepted?.[0]
-
   if (!accepted) return null
 
   const trackInfo = accepted.track_info
@@ -170,6 +123,7 @@ export async function getStatus(number, carrier = null) {
     }))
   )
 
+  // oldest first
   events.sort((a, b) => new Date(a.time || 0) - new Date(b.time || 0))
 
   return {
@@ -178,13 +132,4 @@ export async function getStatus(number, carrier = null) {
     events,
     carrier: accepted.carrier || carrier || null,
   }
-}
-
-export async function getCarrierList() {
-  const response = await fetch(CARRIER_LIST_URL)
-
-  if (!response.ok) throw new Error(`carrier list returned ${response.status}`)
-
-  const data = await response.json()
-  return Array.isArray(data) ? data : data.data || data.carriers || []
 }
