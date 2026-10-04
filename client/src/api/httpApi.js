@@ -5,8 +5,21 @@ const BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 const labels = ['Ordered', 'Shipped', 'In Transit', 'Delivered']
 const values = ['ordered', 'shipped', 'in_transit', 'delivered']
 
+// Anything that gets rendered as text must be a string. Saved events can hold objects
+// (17TRACK's address is one), and React crashes the whole page on an object child.
+function toText(value) {
+  if (typeof value === 'string') return value
+  if (typeof value === 'number') return String(value)
+  if (value && typeof value === 'object') {
+    return [value.city, value.state, value.country]
+      .filter(part => typeof part === 'string' && part)
+      .join(', ')
+  }
+  return ''
+}
+
 // tracking_events can come back as a real list, a JSON string (text column) or null,
-// depending on how it was saved. Always hand the pages a plain array.
+// depending on how it was saved. Always hand the pages a plain array of safe events.
 function toEvents(raw) {
   let value = raw
   for (let i = 0; i < 2 && typeof value === 'string'; i++) {
@@ -16,7 +29,18 @@ function toEvents(raw) {
       return []
     }
   }
-  return Array.isArray(value) ? value.filter(event => event && typeof event === 'object') : []
+
+  if (!Array.isArray(value)) return []
+
+  return value
+    .filter(event => event && typeof event === 'object')
+    .map(event => ({
+      ...event,
+      label: toText(event.label),
+      description: toText(event.description),
+      location: toText(event.location || event.address),
+      date: typeof event.date === 'string' ? event.date : null,
+    }))
 }
 
 function toPage(row) {

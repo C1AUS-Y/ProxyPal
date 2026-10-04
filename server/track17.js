@@ -48,6 +48,21 @@ function throttled(task) {
   return run
 }
 
+// 17TRACK sends address as an object ({ city, state, country, ... }), so turn it into text
+function formatLocation(event) {
+  if (typeof event.location === 'string' && event.location) return event.location
+
+  const address = event.address
+  if (typeof address === 'string') return address
+  if (address && typeof address === 'object') {
+    return [address.city, address.state, address.country]
+      .filter(part => typeof part === 'string' && part)
+      .join(', ')
+  }
+
+  return ''
+}
+
 async function call(endpoint, body, attempt = 0) {
   if (!TRACK17_KEY) throw new Error('TRACK17_KEY is not configured')
 
@@ -153,7 +168,7 @@ export async function getStatus(number, carrier = null) {
       description: event.description_translation?.description || event.description || '',
       date: event.time_iso ? event.time_iso.slice(0, 10) : null,
       time: event.time_iso || null,
-      location: event.location || event.address || '',
+      location: formatLocation(event),
       stage: event.stage || '',
       subStatus: event.sub_status || '',
     }))

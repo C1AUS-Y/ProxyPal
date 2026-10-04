@@ -258,7 +258,7 @@ export default function OrderDetailPage() {
                 {events.map((event, index) => {
                   const latest = index === events.length - 1
                   return (
-                    <li key={`${event.label}-${event.date}`} className="relative flex items-baseline gap-3 pb-5 pl-7 last:pb-0">
+                    <li key={`${event.label}-${event.date}-${index}`} className="relative flex items-baseline gap-3 pb-5 pl-7 last:pb-0">
                       {index < events.length - 1 && (
                         <span aria-hidden="true" className="absolute bottom-0 left-[6px] top-3 w-px bg-text/15" />
                       )}
