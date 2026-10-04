@@ -6,6 +6,8 @@ ProxyPal is a web app for people who buy through proxy shopping services, whethe
 - **API health check:** https://proxypal-aggn.onrender.com/healthz
 - **Demo video:** todo
 
+<img width="1919" height="908" alt="image" src="https://github.com/user-attachments/assets/71b2c478-fecc-4baa-9228-faf7ad6cf2ba" />
+
 ## Features
 
 - **Dashboard:** active orders, the total still owed, and recent orders
