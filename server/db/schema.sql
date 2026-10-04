@@ -7,13 +7,15 @@ CREATE TABLE IF NOT EXISTS profiles (
 
 CREATE TABLE IF NOT EXISTS orders (
   id              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  order_no        INTEGER     NOT NULL, -- per-user number shown in the app, set by a trigger (see migrations/001_order_no.sql)
+  order_no        INTEGER     NOT NULL, -- per-user number shown in the app, filled in by the set_order_no trigger below
   user_id         UUID        NOT NULL DEFAULT auth.uid() REFERENCES auth.users(id) ON DELETE CASCADE,
   proxy_name      TEXT        NOT NULL,
   platform        TEXT        NOT NULL,
   recipient       TEXT        NOT NULL DEFAULT 'Me',
   order_date      DATE,
   tracking_number TEXT,
+  tracking_carrier INTEGER,                          -- 17TRACK courier code
+  tracking_events JSONB       NOT NULL DEFAULT '[]', -- latest tracking events from 17TRACK
   status          TEXT        NOT NULL DEFAULT 'ordered'
                   CHECK (status IN ('ordered', 'shipped', 'in_transit', 'delivered')),
   notes           TEXT
@@ -21,6 +23,30 @@ CREATE TABLE IF NOT EXISTS orders (
 
 -- always on newest first
 CREATE INDEX IF NOT EXISTS orders_user_id_idx ON orders (user_id);
+
+-- a user can never have the same order number twice
+CREATE UNIQUE INDEX IF NOT EXISTS orders_user_order_no_idx ON orders (user_id, order_no);
+
+-- new orders get that user's highest number + 1. Counts only that user's orders,
+-- and a deleted latest order's number is reused.
+CREATE OR REPLACE FUNCTION set_order_no() RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+BEGIN
+  IF NEW.order_no IS NULL THEN
+    -- one insert at a time per user, so two quick saves can't get the same number
+    PERFORM pg_advisory_xact_lock(hashtextextended(NEW.user_id::text, 0));
+    SELECT COALESCE(MAX(order_no), 0) + 1 INTO NEW.order_no FROM orders WHERE user_id = NEW.user_id;
+  END IF;
+  RETURN NEW;
+END
+$$;
+
+DROP TRIGGER IF EXISTS orders_set_order_no ON orders;
+CREATE TRIGGER orders_set_order_no
+  BEFORE INSERT ON orders
+  FOR EACH ROW EXECUTE FUNCTION set_order_no();
 
 CREATE TABLE IF NOT EXISTS items (
   id        BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
