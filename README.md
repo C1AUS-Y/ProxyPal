@@ -156,9 +156,21 @@ The server validates all input itself, because a browser form can be bypassed.
 
 ## Screenshots
 
+### Getting in
+
+| Login | Sign up | Profile |
+| :---: | :---: | :---: |
+| ![Login](https://github.com/user-attachments/assets/8d02fd86-e3ba-4148-9e8d-889b99e275d4) | ![Sign up](https://github.com/user-attachments/assets/dd1dd36c-c455-455b-9ed3-a76fb55fba97) | ![Profile](https://github.com/user-attachments/assets/56ab78d6-bc10-4824-9623-f7fe18f27714) |
+
+### Using the app
+
 | Dashboard | Orders | Order detail |
 | :---: | :---: | :---: |
 | ![Dashboard](https://github.com/user-attachments/assets/ebbd8582-f0c8-479c-a79b-0cc0aefa1edc) | ![Orders](https://github.com/user-attachments/assets/2e7b32cf-c3a7-4da6-bd8d-c7f7ded1aa57) | ![Order detail](https://github.com/user-attachments/assets/4b8aa965-6b59-4e62-91c2-13aa4d201eca) |
+
+| Add / edit order | Payments |
+| :---: | :---: |
+| ![Add order](https://github.com/user-attachments/assets/7f6b990a-98c3-4962-b588-014d70f34078) | ![Payments](https://github.com/user-attachments/assets/8ead0254-141e-4a61-9475-a13e6ca9d07f) |
 
 ## Known issues and next steps
 
