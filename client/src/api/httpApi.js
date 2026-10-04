@@ -135,13 +135,21 @@ export async function addPayment(orderId, payment) {
 }
 
 // courier lookups. These only read the server's bundled carrier list, nothing is sent to 17track
-export async function suggestCarriers(number) {
-  const data = await request(`/api/carriers/suggest?number=${encodeURIComponent(number)}`)
+export async function suggestCarriers(number, country = '') {
+  const params = new URLSearchParams({ number })
+  if (country) params.set('country', country)
+  const data = await request(`/api/carriers/suggest?${params}`)
   return data.suggestions
 }
 
-export async function searchCarriers(query) {
-  return request(`/api/carriers?q=${encodeURIComponent(query)}`)
+export async function searchCarriers(query, country = '') {
+  const params = new URLSearchParams({ q: query })
+  if (country) params.set('country', country)
+  return request(`/api/carriers?${params}`)
+}
+
+export async function listCarrierCountries() {
+  return request('/api/carriers/countries')
 }
 
 export async function lookupCarrier(code) {

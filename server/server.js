@@ -4,7 +4,7 @@ import { pool } from './db/pool.js'
 import { requireAuth } from './auth.js'
 import * as orders from './ordersRepo.js'
 import * as track17 from './track17.js'
-import { trackIfMatched, matchCarrier, suggestCarriers, searchCarriers, getCarrier, isKnownCarrier } from './carrierFallback.js'
+import { trackIfMatched, matchCarrier, suggestCarriers, searchCarriers, listCountries, getCarrier, isKnownCarrier } from './carrierFallback.js'
 
 const app = express()
 
@@ -130,14 +130,18 @@ app.get('/api/orders/:id', async (request, response, next) => {
 
 // all carrier routes read the bundled carriers.json: free, no 17track call
 app.get('/api/carriers', (request, response) => {
-  const { q, code } = request.query
+  const { q, code, country } = request.query
   if (code) return response.json([getCarrier(code)].filter(Boolean))
-  response.json(searchCarriers(q, 20))
+  response.json(searchCarriers(q, 20, country))
+})
+
+app.get('/api/carriers/countries', (request, response) => {
+  response.json(listCountries())
 })
 
 app.get('/api/carriers/suggest', (request, response) => {
   const number = typeof request.query.number === 'string' ? request.query.number : ''
-  const { carrier, suggestions } = matchCarrier(number)
+  const { carrier, suggestions } = matchCarrier(number, request.query.country)
   response.json({ matched: carrier, suggestions })
 })
 

@@ -9,5 +9,6 @@ export {
   addPayment,
   suggestCarriers,
   searchCarriers,
+  listCarrierCountries,
   lookupCarrier,
 } from './httpApi.js'

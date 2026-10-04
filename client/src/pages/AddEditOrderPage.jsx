@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ChevronLeft, Plus, X } from 'lucide-react'
 import Button from '../components/atoms/Button.jsx'
 import Input from '../components/atoms/Input.jsx'
 import { useOrders } from '../orders/OrdersContext.jsx'
-import { suggestCarriers, searchCarriers, lookupCarrier } from '../api'
+import { suggestCarriers, searchCarriers, lookupCarrier, listCarrierCountries } from '../api'
 import { formatMoney, todayISO } from '../lib/orders.js'
 import usePageTitle from '../lib/usePageTitle.js'
 
@@ -15,6 +15,24 @@ const newItem = () => ({
   quantity: '1',
 })
 
+const COUNTRY_KEY = 'proxypal.courierCountry'
+
+function readSavedCountry() {
+  try {
+    return localStorage.getItem(COUNTRY_KEY) ?? ''
+  } catch {
+    return ''
+  }
+}
+
+function saveCountry(code) {
+  try {
+    localStorage.setItem(COUNTRY_KEY, code)
+  } catch {
+    // private mode etc. The choice just won't be remembered
+  }
+}
+
 const carrierLabel = carrier => `${carrier.name} [${carrier.code}]`
 
 function CarrierPicker({ value, trackingNumber, onChange }) {
@@ -22,6 +40,40 @@ function CarrierPicker({ value, trackingNumber, onChange }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [lookupError, setLookupError] = useState(null)
+  const [country, setCountry] = useState(readSavedCountry)
+  const [countryCodes, setCountryCodes] = useState([])
+
+  const countryOptions = useMemo(() => {
+    let names = null
+    try {
+      names = new Intl.DisplayNames(['en'], { type: 'region' })
+    } catch {
+      // older browser: fall back to the code
+    }
+
+    const nameOf = code => {
+      try {
+        return names?.of(code) ?? code
+      } catch {
+        return code
+      }
+    }
+
+    return countryCodes
+      .map(({ code }) => ({ code, name: nameOf(code) }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }, [countryCodes])
+
+  useEffect(() => {
+    listCarrierCountries()
+      .then(setCountryCodes)
+      .catch(caught => setLookupError(caught))
+  }, [])
+
+  function handleCountry(code) {
+    setCountry(code)
+    saveCountry(code)
+  }
 
   // an existing order only has the courier code, so fetch its name for display
   useEffect(() => {
@@ -37,7 +89,7 @@ function CarrierPicker({ value, trackingNumber, onChange }) {
     }
 
     const timer = setTimeout(() => {
-      suggestCarriers(number)
+      suggestCarriers(number, country)
         .then(list => {
           setSuggestions(list)
           setLookupError(null)
@@ -49,17 +101,18 @@ function CarrierPicker({ value, trackingNumber, onChange }) {
     }, 400)
 
     return () => clearTimeout(timer)
-  }, [trackingNumber])
+  }, [trackingNumber, country])
 
   useEffect(() => {
     const text = query.trim()
-    if (text.length < 2) {
+    // with a country picked, an empty box lists that country's couriers
+    if (text.length < 2 && !(country && !text)) {
       setResults([])
       return
     }
 
     const timer = setTimeout(() => {
-      searchCarriers(text)
+      searchCarriers(text, country)
         .then(list => {
           setResults(Array.isArray(list) ? list : [])
           setLookupError(null)
@@ -71,7 +124,7 @@ function CarrierPicker({ value, trackingNumber, onChange }) {
     }, 300)
 
     return () => clearTimeout(timer)
-  }, [query])
+  }, [query, country])
 
   function handleQuery(text) {
     const hit = results.find(carrier => carrierLabel(carrier) === text)
@@ -98,6 +151,15 @@ function CarrierPicker({ value, trackingNumber, onChange }) {
         </div>
       ) : (
         <>
+          <Input as="select" label="courier country" value={country} onChange={e => handleCountry(e.target.value)}>
+            <option value="">any country</option>
+            {countryOptions.map(option => (
+              <option key={option.code} value={option.code}>
+                {option.name}
+              </option>
+            ))}
+          </Input>
+
           {suggestions.length > 0 && (
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-small text-primary">likely:</span>
@@ -116,7 +178,7 @@ function CarrierPicker({ value, trackingNumber, onChange }) {
 
           <Input
             list="carrier-options"
-            placeholder="or search for a courier..."
+            placeholder={country ? 'search couriers in this country...' : 'or search for a courier...'}
             value={query}
             onChange={e => handleQuery(e.target.value)}
           />
