@@ -21,7 +21,6 @@ function homeFirst(list) {
   return [...home, ...others]
 }
 
-// every country that has at least one courier, for the country picker
 export function listCountries() {
   const counts = {}
   for (const c of CARRIERS) {
