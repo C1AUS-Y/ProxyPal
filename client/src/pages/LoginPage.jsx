@@ -6,6 +6,8 @@ import Button from '../components/atoms/Button.jsx'
 import Input from '../components/atoms/Input.jsx'
 import { useAuth } from '../auth/AuthContext.jsx'
 
+const PASSWORD_RULE = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/
+
 export default function LoginPage() {
   const { signIn, signUp } = useAuth()
   const navigate = useNavigate()
@@ -20,6 +22,12 @@ export default function LoginPage() {
   async function handleSubmit(event) {
     event.preventDefault()
     setError('')
+
+    if (mode === 'signup' && !PASSWORD_RULE.test(password)) {
+      setError('Password must be at least 8 characters with a letter and a number.')
+      return
+    }
+
     setLoading(true)
 
     const { error: authError } =
@@ -93,9 +101,13 @@ export default function LoginPage() {
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          minLength={6}
+          minLength={mode === 'signup' ? 8 : undefined}
           required
         />
+
+        {mode === 'signup' && (
+          <p className="-mt-2 pl-1 text-small text-primary">At least 8 characters, with a letter and a number.</p>
+        )}
 
         {error && (
           <p role="alert" className="pop rounded-2xl bg-text/[0.06] px-4 py-3 text-small text-text">
