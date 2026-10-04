@@ -402,6 +402,7 @@ function OrderForm({ existing }) {
               <Input
                 label="price"
                 type="number"
+                className="no-spin"
                 min="0"
                 step="0.01"
                 required

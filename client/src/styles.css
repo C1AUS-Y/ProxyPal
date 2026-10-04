@@ -168,3 +168,15 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* hides the browser's up/down arrows on number inputs that add the no-spin class */
+input.no-spin {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+input.no-spin::-webkit-outer-spin-button,
+input.no-spin::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
