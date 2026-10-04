@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS profiles (
 
 CREATE TABLE IF NOT EXISTS orders (
   id              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  order_no        INTEGER     NOT NULL, -- per-user number shown in the app, set by a trigger (see migrations/001_order_no.sql)
   user_id         UUID        NOT NULL DEFAULT auth.uid() REFERENCES auth.users(id) ON DELETE CASCADE,
   proxy_name      TEXT        NOT NULL,
   platform        TEXT        NOT NULL,

@@ -17,7 +17,7 @@ const FILTERS = [
 ]
 
 const matches = (order, query) =>
-  [`#${order.id}`, order.proxyName, order.recipient, order.platform, order.status, ...order.items.map((i) => i.name)]
+  [`#${order.orderNo}`, order.proxyName, order.recipient, order.platform, order.status, ...order.items.map((i) => i.name)]
     .join(' ')
     .toLowerCase()
     .includes(query)
@@ -106,7 +106,7 @@ export default function OrdersPage() {
                   >
                     <td>
                       <Link to={`/orders/${order.id}`} className="font-semibold">
-                        #{order.id}
+                        #{order.orderNo}
                       </Link>
                     </td>
                     <td>{order.recipient}</td>

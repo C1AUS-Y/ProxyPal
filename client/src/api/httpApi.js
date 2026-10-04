@@ -46,6 +46,8 @@ function toEvents(raw) {
 function toPage(row) {
   return {
     id: row.id,
+    // the number people see. Falls back to the id until the database migration is run
+    orderNo: row.order_no ?? row.id,
     proxyName: row.proxy_name,
     platform: row.platform,
     recipient: row.recipient,

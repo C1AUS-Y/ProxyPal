@@ -38,7 +38,7 @@ export const isActive = (order) => order.status !== 'Delivered'
 
 export function getAllPayments(orders) {
   return orders
-    .flatMap((order) => order.payments.map((payment) => ({ ...payment, orderId: order.id })))
+    .flatMap((order) => order.payments.map((payment) => ({ ...payment, orderId: order.id, orderNo: order.orderNo ?? order.id })))
     .sort((a, b) => b.date.localeCompare(a.date))
 }
 

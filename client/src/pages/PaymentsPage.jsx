@@ -17,9 +17,10 @@ export default function PaymentsPage() {
   const [params] = useSearchParams()
   const orderFilter = params.get('order')
 
+  const filterOrder = orders.find((order) => String(order.id) === orderFilter)
   const all = getAllPayments(orders).filter((p) => !orderFilter || String(p.orderId) === orderFilter)
   const needle = query.trim().toLowerCase()
-  const shown = needle ? all.filter((p) => `#${p.orderId} ${p.method} ${formatDate(p.date)}`.toLowerCase().includes(needle)) : all
+  const shown = needle ? all.filter((p) => `#${p.orderNo} ${p.method} ${formatDate(p.date)}`.toLowerCase().includes(needle)) : all
   const shownTotal = shown.reduce((sum, p) => sum + Number(p.amount), 0)
 
   return (
@@ -35,7 +36,7 @@ export default function PaymentsPage() {
 
       {orderFilter && (
         <p className="pop self-start rounded-full bg-text/[0.06] px-4 py-2 text-small text-primary">
-          Showing payments for Order #{orderFilter}.{' '}
+          Showing payments for Order #{filterOrder?.orderNo ?? orderFilter}.{' '}
           <Link to="/payments" className="font-semibold text-text underline underline-offset-2">
             Show all
           </Link>
@@ -72,7 +73,7 @@ export default function PaymentsPage() {
                 amount={p.amount}
                 date={p.date}
                 method={p.method}
-                orderRef={`Order #${p.orderId}`}
+                orderRef={`Order #${p.orderNo}`}
                 to={`/orders/${p.orderId}`}
               />
             ))}
@@ -99,7 +100,7 @@ export default function PaymentsPage() {
                     <td>{formatDate(p.date)}</td>
                     <td>
                       <Link to={`/orders/${p.orderId}`} className="font-semibold">
-                        Order #{p.orderId}
+                        Order #{p.orderNo}
                       </Link>
                     </td>
                     <td>{p.method}</td>

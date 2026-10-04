@@ -97,13 +97,13 @@ export default function OrderDetailPage() {
   const [logging, setLogging] = useState(false)
 
   const order = orders.find((candidate) => String(candidate.id) === id)
-  usePageTitle(order ? `Order #${order.id}` : 'Order not found')
+  usePageTitle(order ? `Order #${order.orderNo}` : 'Order not found')
 
   if (!order) {
     return (
       <div className="pop flex flex-col items-start gap-4">
         <h1 className="text-heading font-bold">Order not found</h1>
-        <p className="text-primary">There is no order #{id}. It may have been deleted.</p>
+        <p className="text-primary">This order doesn't exist. It may have been deleted.</p>
         <Button to="/orders">Back to orders</Button>
       </div>
     )
@@ -135,7 +135,7 @@ export default function OrderDetailPage() {
           <section className={CARD} aria-labelledby="order-heading" style={{ '--i': 1 }}>
             <div className="flex items-center justify-between gap-3 p-5">
               <h1 id="order-heading" className="text-heading font-bold">
-                Order #{order.id}
+                Order #{order.orderNo}
               </h1>
               <StatusBadge status={order.status} />
             </div>

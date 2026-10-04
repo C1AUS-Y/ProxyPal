@@ -12,7 +12,7 @@ export default function OrderCard({ order, index = 0 }) {
           <Package size={22} strokeWidth={1.75} />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate font-semibold">Order #{order.id}</span>
+          <span className="block truncate font-semibold">Order #{order.orderNo}</span>
           <span className="block truncate text-small text-primary">
             {order.recipient} · {count} item{count === 1 ? '' : 's'}
           </span>
