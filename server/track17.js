@@ -28,7 +28,6 @@ const CARRIER_LIST_URL = 'https://res.17track.net/asset/carrier/info/apicarrier.
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 
-// 17TRACK rate-limits requests, so space them out (one at a time, at least MIN_GAP_MS apart)
 const MIN_GAP_MS = 400
 const MAX_RETRIES = 2
 let queue = Promise.resolve()
@@ -48,7 +47,6 @@ function throttled(task) {
   return run
 }
 
-// 17TRACK sends address as an object ({ city, state, country, ... }), so turn it into text
 function formatLocation(event) {
   if (typeof event.location === 'string' && event.location) return event.location
 

@@ -169,7 +169,6 @@ app.put('/api/orders/:id', async (request, response, next) => {
     const order = await orders.update(pool, request.userId, request.params.id, value)
     if (!order) return response.status(404).json({ error: 'Not found' })
 
-    // editing notes or items must not re-send the number to 17track
     const changed =
       value.trackingNumber !== (before.tracking_number ?? null) ||
       Number(value.trackingCarrier ?? 0) !== Number(before.tracking_carrier ?? 0)
@@ -234,7 +233,6 @@ app.get('/api/orders/:id/tracking', async (request, response, next) => {
     if (!tracking) return response.status(404).json({ error: 'Not found' })
     if (!tracking.tracking_number) return response.status(400).json({ error: 'This order has no tracking number' })
 
-    // no courier saved means nothing is sent to 17track, only local suggestions come back
     if (!tracking.tracking_carrier) {
       const suggestions = suggestCarriers(tracking.tracking_number)
       return response.json({ status: 'ordered', events: [], needsCarrier: true, suggestions })

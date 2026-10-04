@@ -29,7 +29,6 @@ function saveCountry(code) {
   try {
     localStorage.setItem(COUNTRY_KEY, code)
   } catch {
-    // private mode etc. The choice just won't be remembered
   }
 }
 
@@ -46,7 +45,6 @@ function CarrierPicker({ value, trackingNumber, onChange }) {
     try {
       names = new Intl.DisplayNames(['en'], { type: 'region' })
     } catch {
-      // older browser: fall back to the code
     }
 
     const nameOf = code => {
@@ -73,7 +71,6 @@ function CarrierPicker({ value, trackingNumber, onChange }) {
     saveCountry(code)
   }
 
-  // an existing order only has the courier code, so fetch its name for display
   useEffect(() => {
     if (!value || value.name) return
     lookupCarrier(value.code).then(found => found && onChange(found)).catch(() => {})
@@ -103,7 +100,6 @@ function CarrierPicker({ value, trackingNumber, onChange }) {
 
   useEffect(() => {
     const text = query.trim()
-    // with a country picked, an empty box lists that country's couriers
     if (text.length < 2 && !(country && !text)) {
       setResults([])
       return

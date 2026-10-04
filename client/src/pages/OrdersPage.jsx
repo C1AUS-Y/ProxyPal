@@ -76,14 +76,12 @@ export default function OrdersPage() {
 
       {shown.length > 0 && (
         <>
-          {/* Phone: stacked cards. */}
           <ul className="flex flex-col gap-3 md:hidden">
             {shown.map((order, index) => (
               <OrderCard key={order.id} order={order} index={index + 2} />
             ))}
           </ul>
 
-          {/* 768px and up: one card holding the table. */}
           <div className="card rise hidden overflow-hidden md:block" style={{ '--i': 2 }}>
             <table className="w-full text-left">
               <thead>

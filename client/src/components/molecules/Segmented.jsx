@@ -1,4 +1,3 @@
-// iOS-style segmented control. The white thumb slides to the chosen option.
 export default function Segmented({ options, value, onChange, label }) {
   const index = Math.max(
     0,
