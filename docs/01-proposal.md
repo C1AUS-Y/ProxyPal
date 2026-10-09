@@ -33,7 +33,7 @@ Also added after the proposal:
 | Item | Status | Why |
 | --- | --- | --- |
 | Per-order currency and exchange rate | Stretch goal | The app treats every amount as one currency. Proxy orders are often bought in one currency and paid in another, so this is the most useful next feature |
-| My own shipment status labels (for example "arrived in PH", "released to my address") | Changed | Real courier data comes from 17TRACK, so the app maps its statuses to four of its own: ordered, in transit, shipped, delivered |
+| My own shipment status labels (for example "arrived in PH", "released to my address") | Added | Real courier data comes from 17TRACK, so the app maps its statuses to four of its own: ordered, in transit, shipped, delivered |
 | Sample data from my Excel tracker | Cut | Every order belongs to a real account, and a new account starts empty. There is no more seed data |
 | Automated tests | Stretch goal | None written yet |
 
@@ -42,7 +42,7 @@ Also added after the proposal:
 | Piece | Host | The free tier's catch |
 | --- | --- | --- |
 | Client (React, Vite) | GitHub Pages | The workflow must be re-run after changing/updating them |
-| API (Express) | Render | A free web service sleeps when idle, so the first request after a quiet period is slow. |
+| API (Express) | Render | A free web service sleeps when idle, so the first request after a quiet period is slow |
 | Database and login | Supabase | A free project pauses after about a week of low activity and must be restored manually from dashboard |
 | Package tracking | 17TRACK API | Limited to 3 requests per second. The API queues its calls with a 400 ms gap and retries once it is told "too many requests" |
 | Tracking webhooks | Supabase Edge Function | Runs on the same Supabase project, so it has the same pausing catch |
@@ -55,7 +55,7 @@ Demo mode was used up to week 3. It was switched off in week 3 when I started us
 
 | Risk | Then | Now |
 | --- | --- | --- |
-| **Keeping the balance in sync** while the items and payments lists change (my biggest worry in the proposal) | Unsure how to keep it right as nested state changes | **Fixed** The balance is never stored. A database view works it out as items total minus payments every time it is read, so it cannot drift |
-| Free tiers sleeping or pausing | Not considered | **Handled** Covered by the hosting notes above |
+| Keeping the balance in sync while the items and payments lists change (my biggest worry in the proposal) | Unsure how to keep it right as nested state changes | **Fixed** The balance is never stored. A database view works it out as items total minus payments every time it is read, so it cannot drift |
+| Free tiers sleeping or pausing | Not considered | **Fixed** Covered by the hosting notes above |
 | 17TRACK limits and a hidden API key | Not considered | **Fixed** The key lives only on the server, and calls are spaced out and retried to prevent "too many requests" errors |
 | One person's data leaking to other user | Not considered | **Fixed** Every query filters by the logged-in user, and the database uses row level security |
