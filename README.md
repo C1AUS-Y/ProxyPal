@@ -4,7 +4,7 @@ ProxyPal is a web app for people who buy through proxy shopping services, whethe
 
 - **Live site:** https://c1aus-y.github.io/ProxyPal/
 - **API health check:** https://proxypal-aggn.onrender.com/healthz
-- **Demo video:** todo
+- **Demo video:** https://drive.google.com/drive/folders/1ihwZiBl1FSyqvSuFwlbkYK4OL3PZp8Y5
 
 <img width="1919" height="908" alt="image" src="https://github.com/user-attachments/assets/71b2c478-fecc-4baa-9228-faf7ad6cf2ba" />
 
