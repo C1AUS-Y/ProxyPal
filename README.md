@@ -1,12 +1,14 @@
 # ProxyPal
 
+[![Made with AI](https://img.shields.io/badge/Made_with-AI_assistance-blue)](AI-USAGE.md)
+
 ProxyPal is a web app for people who buy through proxy shopping services, whether for themselves or on behalf of someone else. It tracks orders, items, payments, the balance still owed, and package status in one place, replacing the spreadsheet most people use for this.
 
 - **Live site:** https://c1aus-y.github.io/ProxyPal/
 - **API health check:** https://proxypal-aggn.onrender.com/healthz
 - **Demo video:** https://drive.google.com/drive/folders/1ihwZiBl1FSyqvSuFwlbkYK4OL3PZp8Y5
 
-<img width="1919" height="908" alt="image" src="https://github.com/user-attachments/assets/71b2c478-fecc-4baa-9228-faf7ad6cf2ba" />
+![ProxyPal dashboard](docs/assets/dashboard.png)
 
 ## Features
 
@@ -117,6 +119,9 @@ Every `/api` route needs an `Authorization: Bearer <token>` header (the Supabase
 | GET | `/healthz` | Is the server process alive | 200 |
 | GET | `/readyz` | Is the database reachable | 200, 503 |
 | GET | `/api/orders` | List your orders with items and payments | 200 |
+| GET | `/api/carriers` | Search the courier list (by name, code or country) | 200 |
+| GET | `/api/carriers/countries` | Countries that have couriers in the list | 200 |
+| GET | `/api/carriers/suggest` | Suggest couriers for a tracking number | 200 |
 | GET | `/api/orders/:id` | One order with items, payments and balance | 200, 404 |
 | POST | `/api/orders` | Create an order with its items | 201, 400 |
 | PUT | `/api/orders/:id` | Replace an order's details and items | 200, 400, 404 |
@@ -142,6 +147,8 @@ The server validates all input itself, because a browser form can be bypassed.
       auth.js                verifies the Supabase login token
       ordersRepo.js          all SQL for orders, items and payments
       track17.js             17TRACK calls and status mapping
+      carrierFallback.js     works out the courier from a tracking number
+      data/carriers.json     the local courier list
       db/                    schema.sql and the connection pool
     docs/                    proposal, mockup, design system, reports, security notes
 
@@ -160,17 +167,17 @@ The server validates all input itself, because a browser form can be bypassed.
 
 | Login | Sign up | Profile |
 | :---: | :---: | :---: |
-| ![Login](https://github.com/user-attachments/assets/8d02fd86-e3ba-4148-9e8d-889b99e275d4) | ![Sign up](https://github.com/user-attachments/assets/dd1dd36c-c455-455b-9ed3-a76fb55fba97) | ![Profile](https://github.com/user-attachments/assets/56ab78d6-bc10-4824-9623-f7fe18f27714) |
+| ![Login](docs/assets/login.png) | ![Sign up](docs/assets/signup.png) | ![Profile](docs/assets/profile.png) |
 
 ### Using the app
 
 | Dashboard | Orders | Order detail |
 | :---: | :---: | :---: |
-| ![Dashboard](https://github.com/user-attachments/assets/ebbd8582-f0c8-479c-a79b-0cc0aefa1edc) | ![Orders](https://github.com/user-attachments/assets/2e7b32cf-c3a7-4da6-bd8d-c7f7ded1aa57) | ![Order detail](https://github.com/user-attachments/assets/4b8aa965-6b59-4e62-91c2-13aa4d201eca) |
+| ![Dashboard](docs/assets/dashboard.png) | ![Orders](docs/assets/orders.png) | ![Order detail](docs/assets/orderdetails.png) |
 
 | Add / edit order | Payments |
 | :---: | :---: |
-| ![Add order](https://github.com/user-attachments/assets/7f6b990a-98c3-4962-b588-014d70f34078) | ![Payments](https://github.com/user-attachments/assets/8ead0254-141e-4a61-9475-a13e6ca9d07f) |
+| ![Add order](docs/assets/addeditorder.png) | ![Payments](docs/assets/payments.png) |
 
 ## Known issues and next steps
 
@@ -188,7 +195,7 @@ The server validates all input itself, because a browser form can be bypassed.
 
 ## AI use
 
-Built with AI assistance from Claude (Anthropic). See [AI-USAGE.md](AI-USAGE.md) for the full account.
+Built with AI assistance from Claude (Anthropic). Claude built and polished most of the front end (the screens, components and styling) and helped with parts of the 17TRACK code and the database setup. I wrote most of the backend, the database policies and the login and session code. See [AI-USAGE.md](AI-USAGE.md) for the full account.
 
 ## License
 
