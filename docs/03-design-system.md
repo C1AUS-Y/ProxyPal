@@ -4,6 +4,9 @@
 
 I used Tailwind CSS. The five colours are set in `client/src/styles.css` and every screen uses them by name, so changing a colour in that one file changes it everywhere. The reusable pieces are in `client/src/components/`.
 
+## Initial Wireframe
+![Initial wireframe, part 1](assets/initial-wireframe%20part%201.png)
+![Initial wireframe, part 1](assets/initial-wireframe%20part%202.png)
 ## Colors
 
 I specifically chose a monochrome-themed app since it wasn't too aggressive and overwhelming for me in the eyes.
